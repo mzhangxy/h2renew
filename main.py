@@ -143,7 +143,7 @@ def renew_host2play(url, proxy_url=None):
             print("⏳ 等待页面初步加载...")
             time.sleep(6)
 
-            # ==================== 【极致去广告 + 去遮挡】 ====================
+            # ==================== 去广告 + 去遮挡 ====================
             print("🧹 执行【Host2Play专用极致去广告+去遮挡】...")
             sb.execute_script("""
                 function removeByText(text) {
@@ -181,78 +181,68 @@ def renew_host2play(url, proxy_url=None):
                     }
                 });
             """)
-            time.sleep(2.5)
+            time.sleep(2)
 
-            # ==================== 【新增】处理 Cookie Consent 弹窗 ====================
+            # ==================== 处理 Cookie Consent ====================
             print("🔒 处理 Cookie Consent 同意弹窗...")
-            sb.save_screenshot("before_consent.png")   # 调试用
             try:
                 if sb.is_element_visible('button:contains("Consent")'):
                     sb.uc_click('button:contains("Consent")')
-                    print("✅ 已点击 Consent 按钮（同意隐私政策）")
+                    print("✅ 已点击 Consent 按钮")
                     time.sleep(3)
-                elif sb.is_element_visible('button:has-text("Consent")'):
-                    sb.uc_click('button:has-text("Consent")')
-                    print("✅ 已点击 Consent 按钮（备用选择器）")
-                    time.sleep(3)
-                else:
-                    print("未发现 Consent 按钮，跳过")
-            except Exception as e:
-                print(f"Consent 处理异常（不影响流程）: {e}")
+            except:
+                pass
+            sb.save_screenshot("after_consent.png")
 
-            sb.save_screenshot("after_consent.png")   # 调试用
-
-            print("📜 滚动页面让蓝色按钮进入视野...")
-            sb.execute_script("window.scrollBy(0, 600);")
+            # ==================== 第一步：点击打开 Renew 弹窗 ====================
+            print("📜 滚动页面...")
+            sb.execute_script("window.scrollBy(0, 650);")
             time.sleep(1.5)
 
-            # === 点击主页面蓝色 "Renew server" 按钮 ===
-            print("🖱️ 尝试点击蓝色 'Renew server' 按钮...")
-            blue_btn_selectors = [
-                '//button[contains(text(), "Renew server")]',
-                'button:has-text("Renew server")',
-                'button:contains("Renew server")'
-            ]
-
-            clicked = False
-            for sel in blue_btn_selectors:
-                print(f"   尝试定位器: {sel}")
-                if sb.is_element_visible(sel):
-                    sb.scroll_to(sel)
-                    time.sleep(1)
-                    try:
-                        sb.uc_click(sel)
-                        print("✅ uc_click 成功！reCAPTCHA 应该弹出")
-                        clicked = True
-                        break
-                    except:
-                        try:
-                            sb.execute_script("arguments[0].click();", sb.get_element(sel))
-                            print("✅ JS click 成功")
-                            clicked = True
-                            break
-                        except:
-                            continue
-                else:
-                    print("   未找到，继续下一个")
-
-            if not clicked:
-                print("⚠️ 常规定位失败，执行核弹JS强制点击...")
+            print("🖱️ 第一步：点击主页面 'Renew server' 打开弹窗...")
+            try:
+                sb.uc_click('//button[contains(text(), "Renew server")]')
+                print("✅ 第一步点击成功")
+            except:
                 sb.execute_script("""
                     document.querySelectorAll('button').forEach(btn => {
                         if (btn.textContent.trim() === 'Renew server') btn.click();
                     });
                 """)
-                time.sleep(4)
-                print("✅ 已执行强制JS点击")
+                print("✅ 第一步 JS 点击成功")
+            time.sleep(3)
 
-            # ==================== 验证码部分 ====================
+            sb.save_screenshot("renew_popup_opened.png")   # 关键调试截图
+
+            # ==================== 第二步：点击弹窗内蓝色按钮（触发 reCAPTCHA） ====================
+            print("⏳ 等待确认弹窗完全加载...")
+            # 等待关键文字出现
+            for i in range(8):
+                if sb.is_text_visible("Expires in:") or sb.is_text_visible("Deletes on:"):
+                    print("✅ 确认弹窗已出现")
+                    break
+                time.sleep(1)
+
+            print("🖱️ 第二步：点击弹窗内 'Renew server' 按钮（触发 reCAPTCHA）...")
+            try:
+                sb.uc_click('button:contains("Renew server")')
+                print("✅ 弹窗内按钮点击成功！reCAPTCHA 应该弹出")
+            except:
+                sb.execute_script("""
+                    document.querySelectorAll('button').forEach(btn => {
+                        if (btn.textContent.trim() === 'Renew server') btn.click();
+                    });
+                """)
+                print("✅ 已执行 JS 二次点击")
+            time.sleep(6)   # 给 reCAPTCHA 充分加载时间
+
+            # ==================== 验证码破解部分 ====================
             solved_captcha = False
-            print("🔍 寻找 reCAPTCHA 验证码弹窗...")
+            print("🔍 寻找 reCAPTCHA 验证码框...")
             anchor_iframe_xpath = '//iframe[contains(@src, "recaptcha/api2/anchor")]'
 
             if sb.is_element_visible(anchor_iframe_xpath):
-                print("✅ 成功加载出 reCAPTCHA 验证码框！")
+                print("✅ reCAPTCHA 弹出成功！")
                 sb.switch_to_frame(anchor_iframe_xpath)
                 sb.uc_click('#recaptcha-anchor')
                 time.sleep(5)
@@ -261,7 +251,7 @@ def renew_host2play(url, proxy_url=None):
                 sb.switch_to_default_content()
 
                 if checked != 'true':
-                    print("🎲 触发验证挑战，调用破解器...")
+                    print("🎲 需要破解验证码...")
                     bframe_xpath = '//iframe[contains(@src, "recaptcha/api2/bframe")]'
                     if sb.is_element_visible(bframe_xpath):
                         sb.switch_to_frame(bframe_xpath)
@@ -272,7 +262,7 @@ def renew_host2play(url, proxy_url=None):
                 else:
                     solved_captcha = True
             else:
-                print("⚠️ 未发现验证码弹窗")
+                print("⚠️ 未发现 reCAPTCHA")
                 sb.save_screenshot(f"debug_no_recaptcha_{int(time.time())}.png")
 
             if solved_captcha:
@@ -287,7 +277,7 @@ def renew_host2play(url, proxy_url=None):
                     msg = "❌ 找不到最终 Renew 按钮"
                     sb.save_screenshot(f"debug_no_final_renew_{int(time.time())}.png")
             else:
-                msg = "❌ 无法唤出或通过验证码弹窗"
+                msg = "❌ 无法唤出或通过 reCAPTCHA"
 
     except Exception as e:
         msg = f"💥 运行异常: {str(e)[:200]}"
