@@ -22,13 +22,14 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install seleniumbase
+          pip install seleniumbase requests 
 
       - name: Run Auto Renew Script
         env:
           ACCOUNTS_DATA: ${{ secrets.ACCOUNTS_DATA }} 
+          NOPECHA_API_KEY: ${{ secrets.NOPECHA_API_KEY }}
         run: |
-          python main.py 
+          python main.py
           
       - name: Upload Debug Artifacts
         uses: actions/upload-artifact@v4
