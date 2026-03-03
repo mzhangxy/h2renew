@@ -70,8 +70,24 @@ def main():
                 print(f"账户 {index + 1} 续期操作执行完毕！")
                 sb.sleep(5) # 给页面提交后一点缓冲时间
                 
+
             except Exception as e:
-                print(f"账户 {index + 1} 处理时发生错误: {e}")
+                print(f"\n[错误] 账户 {index + 1} 处理时发生异常: {e}")
+                
+                # --- 新增的调试代码 ---
+                print("正在保存案发现场截图和网页源码...")
+                screenshot_name = f"error_account_{index + 1}.png"
+                html_name = f"error_account_{index + 1}.html"
+                
+                # 保存当前浏览器画面的截图
+                sb.save_screenshot(screenshot_name)
+                
+                # 保存当前网页的完整 HTML 源码
+                with open(html_name, "w", encoding="utf-8") as f:
+                    f.write(sb.get_page_source())
+                    
+                print(f"现场截图已保存为: {screenshot_name}")
+                print(f"网页源码已保存为: {html_name}")
 
 if __name__ == "__main__":
     main()
