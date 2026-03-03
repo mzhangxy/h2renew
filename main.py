@@ -139,10 +139,7 @@ class RecaptchaAudioSolver:
         except: return None
 
 # ==============================================================================
-# 核心续期业务逻辑
-# ==============================================================================
-# ==============================================================================
-# 核心续期业务逻辑 (JS 函数直接调用版)
+# 核心续期业务逻辑 (JS 深度抓错版)
 # ==============================================================================
 def renew_host2play(url, proxy_url=None):
     print("启动 Xvfb 虚拟桌面...")
@@ -175,7 +172,6 @@ def renew_host2play(url, proxy_url=None):
         page.scroll.down(500)
         time.sleep(1)
 
-        # 核心修复 1：利用你 F12 发现的特征，极其精确地定位这个特殊的按钮
         print("🔍 寻找带有 renew() 函数的按钮...")
         first_renew_btn = page.ele('xpath://button[contains(@onclick, "renew()")]', timeout=20)
         
@@ -190,12 +186,28 @@ def renew_host2play(url, proxy_url=None):
         for attempt in range(3):
             print(f"⚡ 尝试触发续期弹窗 (第 {attempt+1} 次)...")
             
-            # 核心修复 2：终极杀招！直接命令浏览器执行网页源码里的 renew() 函数，无视一切物理阻碍！
+            # 核心排查：加入 try-catch 捕获浏览器端的真实报错并传回 Python
+            js_debug_code = """
+            try {
+                if (typeof renew === 'function') {
+                    renew();
+                    return "SUCCESS: 全局 renew() 执行完成";
+                } else if (typeof window.renew === 'function') {
+                    window.renew();
+                    return "SUCCESS: window.renew() 执行完成";
+                } else {
+                    return "ERROR: 找不到 renew 函数，typeof renew 结果是: " + typeof renew;
+                }
+            } catch (e) {
+                return "EXCEPTION 报错抓取: " + e.name + " - " + e.message;
+            }
+            """
             try:
-                page.run_js("if(typeof renew === 'function') { renew(); } else { console.log('没有找到全局 renew 函数'); }")
-                print("💉 已向页面注入并执行 renew() 函数指令")
+                # 获取 js 的 return 结果
+                js_result = page.run_js(js_debug_code)
+                print(f"🔬 [JS Debug] 网页控制台返回结果: {js_result}")
             except Exception as e:
-                print(f"⚠️ 执行代码块异常: {e}")
+                print(f"⚠️ [JS Debug] Python 执行代码时发生异常: {e}")
                 
             time.sleep(5) 
             
@@ -232,7 +244,6 @@ def renew_host2play(url, proxy_url=None):
                     print("✨ 验证秒过！")
                 
                 print("🚀 验证完成，点击弹窗中最终的 Renew 按钮...")
-                # 最终确认按钮
                 final_renew_btn = page.ele('xpath://button[normalize-space(text())="Renew"]', timeout=10) 
                 
                 if final_renew_btn:
