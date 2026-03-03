@@ -116,9 +116,6 @@ class RecaptchaAudioSolver:
         except: 
             return None
 
-# ==============================================================================
-# 核心续期业务逻辑 (SeleniumBase UC 模式)
-# ==============================================================================
 def renew_host2play(url, proxy_url=None):
     print("启动 Xvfb 虚拟桌面...")
     vdisplay = Xvfb(width=1280, height=720, colordepth=24)
@@ -128,52 +125,39 @@ def renew_host2play(url, proxy_url=None):
     msg = ""
     
     try:
-        # 启动 UC 模式。无头设为 False，由 Xvfb 接管虚拟显示器
         with SB(uc=True, proxy=proxy_url, headless=False, browser="chrome") as sb:
             print(f"🌐 访问续期目标网址: {url}")
-            # uc_open 会自动处理基础的 Cloudflare 盾
             sb.uc_open_with_reconnect(url, 4) 
             
             print("⏳ 等待页面加载...")
-            time.sleep(3) 
+            time.sleep(5) 
+
+            # --- 新增：清理广告干扰 ---
+            print("🧹 正在清理页面广告干扰...")
+            sb.execute_script("""
+                const selectors = ['iframe[src*="googleads"]', 'ins.adsbygoogle', 'div[id^="google_ads"]', '.ad-container'];
+                selectors.forEach(s => document.querySelectorAll(s).forEach(el => el.remove()));
+            """)
             
             print("📜 向下滚动页面...")
-            sb.execute_script("window.scrollBy(0, 500);")
+            sb.execute_script("window.scrollBy(0, 450);")
             time.sleep(1)
 
             first_btn_xpath = '//button[normalize-space(text())="Renew server"]'
             
-            # ================= 触发续期弹窗循环 =================
             solved_captcha = False
             for attempt in range(3):
                 print(f"\n⚡ 第 {attempt+1} 次尝试获取验证码弹窗...")
                 
                 if not sb.is_element_visible(first_btn_xpath):
-                    refresh_xpath = '//button[contains(text(), "Refresh page")]'
-                    if sb.is_element_visible(refresh_xpath):
-                        print("🔄 发现 'Refresh page' 按钮，尝试原生刷新...")
-                        sb.refresh()
-                        time.sleep(5)
-                        sb.execute_script("window.scrollBy(0, 500);")
-                    else:
-                        print("❌ 未找到初始的 'Renew server' 按钮")
-                        sb.save_screenshot('error_no_first_btn.png')
-                        break
-                        
-                print(f"🖱️ 尝试物理点击初始 'Renew server' 按钮...")
-                # uc_click 是终极武器，模拟真实物理点击，绕过 CF 事件拦截
-                sb.uc_click(first_renew_btn_xpath := first_btn_xpath)
-                time.sleep(5) 
-                
-                # 检测是否报错
-                refresh_xpath = '//button[contains(text(), "Refresh page")]'
-                if sb.is_element_visible(refresh_xpath):
-                    print("💥 检测到服务器内部错误 (Internal server error)！")
-                    print("🔄 正在强制刷新浏览器页面进行自愈重试...")
                     sb.refresh()
                     time.sleep(5)
-                    sb.execute_script("window.scrollBy(0, 500);")
-                    continue 
+                    sb.execute_script("window.scrollBy(0, 450);")
+                        
+                print(f"🖱️ 尝试点击初始 'Renew server' 按钮...")
+                # 使用普通点击与 uc_click 结合，并增加点击后的等待
+                sb.click(first_btn_xpath) 
+                time.sleep(6) 
                 
                 print("🔍 寻找验证码弹窗...")
                 anchor_iframe_xpath = '//iframe[contains(@src, "recaptcha/api2/anchor")]'
@@ -181,40 +165,35 @@ def renew_host2play(url, proxy_url=None):
                 if sb.is_element_visible(anchor_iframe_xpath):
                     print("✅ 成功加载出 reCAPTCHA 验证码框！")
                     
-                    # 切换进 iframe 内部去点复选框
                     sb.switch_to_frame(anchor_iframe_xpath)
                     print("🖱️ 物理点击验证码复选框...")
                     sb.uc_click('#recaptcha-anchor')
                     time.sleep(4)
                     
-                    # 检查是否变成对勾
                     checked = sb.get_attribute('#recaptcha-anchor', 'aria-checked')
-                    sb.switch_to_default_content() # 切回主页面
+                    sb.switch_to_default_content() 
                     
                     if checked != 'true':
                         print("🎲 触发验证挑战，调用破解器...")
                         bframe_xpath = '//iframe[contains(@src, "recaptcha/api2/bframe")]'
-                        if sb.is_element_visible(bframe_xpath):
-                            # 切入 challenge iframe
+                        if sb.is_element_present(bframe_xpath): # 使用 is_element_present 兼容隐藏 iframe
                             sb.switch_to_frame(bframe_xpath)
                             solver = RecaptchaAudioSolver(sb)
                             if not solver.solve():
                                 msg = "❌ 破解未能通过"
-                                print(msg)
                                 sb.switch_to_default_content()
-                                sb.save_screenshot('error_solver_fail.png')
                                 return False, msg
-                            sb.switch_to_default_content() # 破解完毕，切回主页面
+                            sb.switch_to_default_content() 
                     else:
                         print("✨ 验证秒过！")
                         
                     solved_captcha = True
                     break
                 else:
-                    print("⚠️ 未加载出验证码弹窗。尝试按 ESC 清除可能的遮罩层...")
-                    sb.press_keys('body', '\x1b') # 模拟按下 ESC
+                    print("⚠️ 未加载出验证码弹窗。尝试按 ESC 并微调滚动...")
+                    sb.press_keys('body', '\x1b') 
+                    sb.execute_script("window.scrollBy(0, 100);")
                     time.sleep(2)
-            # ========================================================
 
             if solved_captcha:
                 print("🚀 验证完成，点击弹窗中最终的 Renew 按钮...")
@@ -224,27 +203,17 @@ def renew_host2play(url, proxy_url=None):
                     sb.uc_click(final_renew_btn_xpath)
                     print("⏳ 等待续期请求处理...")
                     time.sleep(8) 
-                    
-                    msg = "🎉 恭喜！服务器续期操作成功执行，时间已延长。"
-                    print(msg)
+                    msg = "🎉 恭喜！服务器续期操作成功执行。"
                     success = True
-                    sb.save_screenshot('success_renew.png')
                 else:
-                    msg = "❌ 找不到弹窗中的最终 Renew (紫色) 按钮"
-                    print(msg)
-                    sb.save_screenshot('error_no_final_btn.png')
+                    msg = "❌ 找不到最终 Renew 按钮"
             else:
-                if not msg:
-                    msg = "❌ 3次尝试均未能找到 reCAPTCHA iframe，放弃操作。"
-                print(msg)
-                sb.save_screenshot('error_no_iframe_final.png')
+                msg = "❌ 3次尝试均未能找到 reCAPTCHA iframe"
 
     except Exception as e:
         msg = f"💥 执行过程中出现异常: {e}"
-        print(f"\n{msg}")
     finally:
         vdisplay.stop()
-        print("Xvfb 虚拟桌面已关闭。")
         return success, msg
 
 # ==============================================================================
