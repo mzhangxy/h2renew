@@ -46,61 +46,11 @@ def main():
                 # --- 处理可能出现的九宫格/语音挑战弹窗 ---
                 print("检查是否弹出了验证码挑战框...")
                 # 给插件一点额外的时间来渲染注入的按钮（无头模式下加载通常比较慢）
-                    sb.sleep(3) 
+                sb.sleep(3) 
+                
                 if sb.is_element_visible("iframe[title*='recaptcha challenge']"):
                     print("检测到挑战弹窗，召唤 Buster 插件出场...")
                     sb.switch_to_frame("iframe[title*='recaptcha challenge']")
                     sb.sleep(1)    
                     
-                  # 查找 Buster 注入的黄色小人/耳机按钮
-                    if sb.is_element_visible('#solver-button'):
-                        print("找到 Buster 破解按钮，点击执行自动听写！")
-                        sb.click('#solver-button')
-                        # 语音识别需要一定时间，多给几秒缓冲
-                        sb.sleep(8) 
-                    else:
-                        print("没有找到 Buster 按钮，可能是插件没正确加载或版本不兼容。")
-                        
-                        # --- 新增的调试代码：记录案发现场 ---
-                        print("正在保存验证码挑战框的截图和 iframe 源码...")
-                        screenshot_name = f"no_buster_account_{index + 1}.png"
-                        html_name = f"no_buster_iframe_{index + 1}.html"
-                        
-                        # 保存截图（拍下整个浏览器的画面，看看弹窗是不是真的出来了）
-                        sb.save_screenshot(screenshot_name)
-                        
-                        # 保存当前 iframe 内部的 HTML 源码（非常关键，能看出插件到底有没有把代码塞进去）
-                        with open(html_name, "w", encoding="utf-8") as f:
-                            f.write(sb.get_page_source())
-                            
-                        print(f"验证码弹窗截图已保存为: {screenshot_name}")
-                        print(f"iframe 源码已保存为: {html_name}")
-                
-                # --- 最后一步提交 ---
-                print("准备点击最终的 'Renew' 提交按钮...")
-                sb.click('button:contains("Renew")')
-                
-                print(f"账户 {index + 1} 续期操作执行完毕！")
-                sb.sleep(5) # 给页面提交后一点缓冲时间
-                
-
-            except Exception as e:
-                print(f"\n[错误] 账户 {index + 1} 处理时发生异常: {e}")
-                
-                # --- 新增的调试代码 ---
-                print("正在保存案发现场截图和网页源码...")
-                screenshot_name = f"error_account_{index + 1}.png"
-                html_name = f"error_account_{index + 1}.html"
-                
-                # 保存当前浏览器画面的截图
-                sb.save_screenshot(screenshot_name)
-                
-                # 保存当前网页的完整 HTML 源码
-                with open(html_name, "w", encoding="utf-8") as f:
-                    f.write(sb.get_page_source())
-                    
-                print(f"现场截图已保存为: {screenshot_name}")
-                print(f"网页源码已保存为: {html_name}")
-
-if __name__ == "__main__":
-    main()
+                    # 查找 Buster 注入的黄色小人/耳机按钮
