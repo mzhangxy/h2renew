@@ -1,10 +1,41 @@
 import os
 import json
+import requests
 from seleniumbase import SB
 
+def get_nopecha_token(api_key, sitekey, page_url):
+    """
+    负责将网站信息发送给 NopeCha，并等待返回破解好的 Token
+    """
+    print("正在呼叫 NopeCha 平台进行云端打码...")
+    url = "https://api.nopecha.com/"
+    payload = {
+        "key": api_key,
+        "type": "recaptcha2",
+        "sitekey": sitekey,
+        "url": page_url
+    }
+    
+    try:
+        # NopeCha 破解一般需要几秒到十几秒，这里设置 60 秒超时
+        response = requests.post(url, json=payload, timeout=60)
+        result = response.json()
+        
+        if "data" in result:
+            print("太棒了！NopeCha 成功返回了 Token！")
+            return result["data"]
+        else:
+            print(f"NopeCha 报错了: {result.get('message', '未知错误')}")
+            return None
+    except Exception as e:
+        print(f"请求 NopeCha API 时发生网络错误: {e}")
+        return None
+
 def main():
-    # 1. 从环境变量读取多账户配置 (GitHub Secret 传过来的)
+    # 1. 读取账户配置
     accounts_json = os.environ.get("ACCOUNTS_DATA", "[]")
+    # 2. 读取你的 NopeCha API 密钥 (我们稍后要在 GitHub 里配置它)
+    nopecha_api_key = os.environ.get("NOPECHA_API_KEY", "")
     
     try:
         accounts = json.loads(accounts_json)
@@ -12,100 +43,67 @@ def main():
         print("解析 Secret 失败，请检查 JSON 格式！")
         return
 
-    # 2. 设置 Buster 插件的相对路径（确保这个文件夹和 main.py 在同一级目录）
-    buster_extension_path = "./buster_extension"
-
-    # 3. 循环处理每一个账户
+    # 循环处理每一个账户
     for index, account in enumerate(accounts):
-        url = account.get("url")
+        target_url = account.get("url")
         proxy = account.get("proxy")
         
         print(f"\n--- 正在处理第 {index + 1} 个账户 ---")
-        print(f"目标 URL: {url}")
+        print(f"目标 URL: {target_url}")
         
-        # 启动 SeleniumBase (开启 UC 模式，挂载代理，加载本地扩展，使用虚拟显示器)
-        with SB(uc=True, proxy=proxy, extension_dir=buster_extension_path, xvfb=True) as sb:
+        # 启动 SeleniumBase (删除了插件加载，保持干净的无头模式)
+        with SB(uc=True, proxy=proxy, headless=True) as sb:
             try:
-                # 访问续期页面
-                sb.open(url)
-                sb.sleep(5) # 等待页面初始加载
+                # 访问网页
+                sb.open(target_url)
+                sb.sleep(5) 
                 
                 print("页面已加载，准备点击 'Renew server' 按钮...")
-                
-                # --- 第一步点击 ---
                 sb.click('button.btn-primary:contains("Renew server")') 
-                sb.sleep(3) # 等待弹窗和 reCAPTCHA iframe 渲染完成
+                sb.sleep(3) # 等待验证码模块加载
                 
-                # --- 处理 reCAPTCHA 复选框 ---
-                print("准备点击 'I'm not a robot' 复选框...")
-                sb.switch_to_frame("iframe[title*='reCAPTCHA']") 
-                sb.click('#recaptcha-anchor')
-                sb.switch_to_default_content() # 必须切回主页面
-                sb.sleep(2) # 给弹窗一点加载时间
+                # --- 开始 NopeCha 纯协议打码流程 ---
+                print("开始调用 NopeCha API...")
                 
-                # --- 处理可能出现的九宫格/语音挑战弹窗 ---
-                print("检查是否弹出了验证码挑战框...")
-                # 给插件一点额外的时间来渲染注入的按钮（无头模式下加载通常比较慢）
-                sb.sleep(3) 
+                if not nopecha_api_key:
+                    print("[致命错误] 找不到 NOPECHA_API_KEY，请检查环境变量配置！")
+                    continue
                 
-                if sb.is_element_visible("iframe[title*='recaptcha challenge']"):
-                    print("检测到挑战弹窗，召唤 Buster 插件出场...")
-                    sb.switch_to_frame("iframe[title*='recaptcha challenge']")
-                    sb.sleep(1)    
+                # 网页里固定的 reCAPTCHA 身份识别码
+                target_sitekey = "6LeUAtQiAAAAADTs_7zmhdpi_78S9bW-zzDFmpV2"
+                
+                # 获取 Token
+                token = get_nopecha_token(nopecha_api_key, target_sitekey, target_url)
+                
+                if token:
+                    print("准备将 Token 隐身注入到网页内部...")
                     
-                    # 查找 Buster 注入的黄色小人/耳机按钮
-                    if sb.is_element_visible('#solver-button'):
-                        print("找到 Buster 破解按钮，点击执行自动听写！")
-                        sb.click('#solver-button')
-                        # 语音识别需要一定时间，多给几秒缓冲
-                        sb.sleep(8) 
-                    else:
-                        print("没有找到 Buster 按钮，可能是插件没正确加载或版本不兼容。")
-                        
-                        # --- 新增的调试代码：记录案发现场 ---
-                        print("正在保存验证码挑战框的截图和 iframe 源码...")
-                        screenshot_name = f"no_buster_account_{index + 1}.png"
-                        html_name = f"no_buster_iframe_{index + 1}.html"
-                        
-                        # 保存截图（拍下整个浏览器的画面，看看弹窗是不是真的出来了）
-                        sb.save_screenshot(screenshot_name)
-                        
-                        # 保存当前 iframe 内部的 HTML 源码（非常关键，能看出插件到底有没有把代码塞进去）
-                        with open(html_name, "w", encoding="utf-8") as f:
-                            f.write(sb.get_page_source())
-                            
-                        print(f"验证码弹窗截图已保存为: {screenshot_name}")
-                        print(f"iframe 源码已保存为: {html_name}")
-                        
-                    # 极其重要：无论插件有没有找到，处理完弹窗都必须切回主网页！
-                    sb.switch_to_default_content() 
+                    # 关键魔法：直接用一段 JavaScript 把 Token 塞进页面的隐藏表单里
+                    inject_js = f'document.getElementById("g-recaptcha-response").innerHTML="{token}";'
+                    sb.execute_script(inject_js)
+                    sb.sleep(1)
+                    
+                    # 提交
+                    print("准备点击最终的 'Renew' 提交按钮...")
+                    sb.click('button:contains("Renew")')
+                    print(f"账户 {index + 1} 续期操作执行完毕！")
                 else:
-                    print("网络信誉极佳！没有弹出挑战框，直接秒过。")
+                    print(f"账户 {index + 1} 因为未获取到 Token，跳过执行。")
                 
-                # --- 最后一步提交 ---
-                print("准备点击最终的 'Renew' 提交按钮...")
-                sb.click('button:contains("Renew")')
-                
-                print(f"账户 {index + 1} 续期操作执行完毕！")
                 sb.sleep(5) # 给页面提交后一点缓冲时间
                 
             except Exception as e:
                 print(f"\n[错误] 账户 {index + 1} 处理时发生异常: {e}")
                 
-                # --- 新增的调试代码 ---
-                print("正在保存案发现场截图和网页源码...")
+                # --- 错误现场拍照 ---
                 screenshot_name = f"error_account_{index + 1}.png"
                 html_name = f"error_account_{index + 1}.html"
                 
-                # 保存当前浏览器画面的截图
                 sb.save_screenshot(screenshot_name)
-                
-                # 保存当前网页的完整 HTML 源码
                 with open(html_name, "w", encoding="utf-8") as f:
                     f.write(sb.get_page_source())
                     
                 print(f"现场截图已保存为: {screenshot_name}")
-                print(f"网页源码已保存为: {html_name}")
 
 if __name__ == "__main__":
     main()
