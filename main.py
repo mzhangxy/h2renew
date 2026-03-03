@@ -139,7 +139,7 @@ class RecaptchaAudioSolver:
         except: return None
 
 # ==============================================================================
-# 核心续期业务逻辑 (纯物理点击 + 错误自愈版)
+# 核心续期业务逻辑 (纯物理点击 + 原生刷新自愈版)
 # ==============================================================================
 def renew_host2play(url, proxy_url=None):
     print("启动 Xvfb 虚拟桌面...")
@@ -182,11 +182,11 @@ def renew_host2play(url, proxy_url=None):
             if not first_renew_btn:
                 msg = "❌ 未找到初始的 'Renew server' 按钮 (button 标签)"
                 print(msg)
-                # 应对极端情况：如果一开始就显示了报错页面，尝试点刷新
+                # 应对极端情况：如果一开始就显示了报错页面，尝试原生刷新
                 refresh_btn = page.ele('text:Refresh page', timeout=2)
                 if refresh_btn:
-                    print("🔄 发现 'Refresh page' 按钮，正在点击重置页面状态...")
-                    human_move_and_click(page, refresh_btn)
+                    print("🔄 发现 'Refresh page' 按钮，正在通过浏览器原生刷新重置状态...")
+                    page.refresh()
                     time.sleep(5)
                     continue
                 else:
@@ -204,13 +204,13 @@ def renew_host2play(url, proxy_url=None):
             human_move_and_click(page, first_renew_btn)
             time.sleep(5) # 给弹窗或者报错提示加载的时间
             
-            # --- 新增的错误自愈检测机制 ---
+            # --- 原生刷新自愈检测机制 ---
             # 检测是否出现了 500 Internal Server Error 导致的 Refresh page 按钮
             refresh_btn = page.ele('text:Refresh page', timeout=3)
             if refresh_btn:
                 print("💥 检测到服务器内部错误 (Internal server error)！")
-                print("🔄 正在点击 'Refresh page' 按钮进行自愈重试...")
-                human_move_and_click(page, refresh_btn)
+                print("🔄 正在强制刷新浏览器页面进行自愈重试...")
+                page.refresh()
                 time.sleep(5)
                 continue # 刷新后，直接进入下一次循环重试
             
