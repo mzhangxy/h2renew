@@ -142,7 +142,7 @@ class RecaptchaAudioSolver:
 # 核心续期业务逻辑
 # ==============================================================================
 # ==============================================================================
-# 核心续期业务逻辑 (加入抗广告、滚动与精确匹配机制)
+# 核心续期业务逻辑 (纯物理点击版)
 # ==============================================================================
 def renew_host2play(url, proxy_url=None):
     print("启动 Xvfb 虚拟桌面...")
@@ -169,45 +169,37 @@ def renew_host2play(url, proxy_url=None):
         page.get(url)
         
         print("⏳ 等待页面加载...")
-        time.sleep(3) # 给广告和弹窗一点加载时间
+        time.sleep(3) 
         
-        print("📜 向下滚动页面，使底层按钮进入可视区域...")
-        # 模拟滚轮向下滚动，跨过顶部的巨幅广告
+        print("📜 向下滚动页面，准备定位按钮...")
         page.scroll.down(500)
         time.sleep(1)
 
-        # 核心修复 1：使用 text= 进行“精确匹配”，彻底排除 "Renew server: mcf..." 标题的干扰
+        # 核心修复：使用严格的 XPath 定位，确保只抓取真正的 button 标签
         print("🔍 寻找精确的 'Renew server' 按钮...")
-        first_renew_btn = page.ele('text=Renew server', timeout=20)
+        first_renew_btn = page.ele('xpath://button[normalize-space(text())="Renew server"]', timeout=20)
         
         if not first_renew_btn:
-            # 备用方案：如果严格等于没找到，就找包含该文字的 button 或 a 标签
-            first_renew_btn = page.ele('xpath://button[contains(., "Renew server")] | //a[contains(., "Renew server")]', timeout=5)
-
-        if not first_renew_btn:
-            msg = "❌ 未找到初始的 'Renew server' 按钮"
+            msg = "❌ 未找到初始的 'Renew server' 按钮 (button 标签)"
             print(msg)
             page.get_screenshot(path='.', name='error_no_first_btn.png')
             return False, msg
             
-        # 核心修复 2：将找出的按钮强制滚动到屏幕视口正中间
+        # 将找出的按钮强制滚动到屏幕视口正中间
         try:
             first_renew_btn.scroll.to_see(center=True)
             time.sleep(1)
         except Exception as e:
             print(f"⚠️ 滚动居中时出现小警告(不影响后续): {e}")
             
-        # ================= 抗广告点击循环 =================
+        # ================= 纯物理点击循环 =================
         checkbox_frame = None
         for attempt in range(3):
-            print(f"🖱️ 尝试点击初始 'Renew server' 按钮 (第 {attempt+1} 次)...")
-            # 优先使用人类模拟点击，如果失败再用JS点击
-            try:
-                human_move_and_click(page, first_renew_btn)
-            except:
-                first_renew_btn.click(by_js=True)
-                
-            time.sleep(4)
+            print(f"🖱️ 尝试物理点击初始 'Renew server' 按钮 (第 {attempt+1} 次)...")
+            
+            # 严格按照你的指令：只使用物理模拟点击，不再使用 JS 点击
+            human_move_and_click(page, first_renew_btn)
+            time.sleep(5) # 给弹窗多一点点加载时间
             
             print("🔍 寻找验证码弹窗...")
             checkbox_frame = page.get_frame('@src*:recaptcha/api2/anchor', timeout=6)
@@ -219,16 +211,13 @@ def renew_host2play(url, proxy_url=None):
                 print("⚠️ 未加载出验证码弹窗。尝试按 ESC 清除可能的遮罩层...")
                 page.actions.key_down('ESCAPE').key_up('ESCAPE')
                 time.sleep(2)
-                # 再次确保按钮在视野内
-                page.scroll.down(200) 
         # ========================================================
 
         if checkbox_frame:
             checkbox = checkbox_frame.ele('#recaptcha-anchor', timeout=10)
             if checkbox:
-                # 这里的复选框用人类轨迹点击比较安全
+                print("🖱️ 物理点击验证码复选框...")
                 human_move_and_click(page, checkbox)
-                print("🖱️ 已点击复选框，等待响应...")
                 time.sleep(4)
                 
                 if checkbox.attr('aria-checked') != 'true':
@@ -245,11 +234,11 @@ def renew_host2play(url, proxy_url=None):
                     print("✨ 验证秒过！")
                 
                 print("🚀 验证完成，点击弹窗中最终的 Renew 按钮...")
-                # 精确匹配最终的 Renew 按钮
-                final_renew_btn = page.ele('text=Renew', timeout=10) 
+                # 最终按钮也使用严格的 XPath 物理点击
+                final_renew_btn = page.ele('xpath://button[normalize-space(text())="Renew"]', timeout=10) 
                 
                 if final_renew_btn:
-                    final_renew_btn.click(by_js=True)
+                    human_move_and_click(page, final_renew_btn)
                     print("⏳ 等待续期请求处理...")
                     time.sleep(8) 
                     
