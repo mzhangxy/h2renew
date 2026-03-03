@@ -23,8 +23,8 @@ def main():
         print(f"\n--- 正在处理第 {index + 1} 个账户 ---")
         print(f"目标 URL: {url}")
         
-        # 启动 SeleniumBase (开启 UC 模式，挂载代理，加载本地扩展，无头模式运行)
-        with SB(uc=True, proxy=proxy, extension_dir=buster_extension_path, headless=True) as sb:
+        # 启动 SeleniumBase (开启 UC 模式，挂载代理，加载本地扩展，使用虚拟显示器)
+        with SB(uc=True, proxy=proxy, extension_dir=buster_extension_path, xvfb=True) as sb:
             try:
                 # 访问续期页面
                 sb.open(url)
