@@ -139,7 +139,7 @@ def renew_host2play(url, proxy_url=None):
             print("⏳ 等待页面初步加载...")
             time.sleep(6) 
 
-print("🧹 执行【Host2Play专用极致去广告+去遮挡】...")
+    print("🧹 执行【Host2Play专用极致去广告+去遮挡】...")
             sb.execute_script("""
                 // 1. 删除所有已知广告和浮层（包括AI Coding横幅）
                 const badSelectors = [
