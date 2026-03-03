@@ -142,7 +142,7 @@ class RecaptchaAudioSolver:
 # 核心续期业务逻辑
 # ==============================================================================
 # ==============================================================================
-# 核心续期业务逻辑 (纯物理点击版)
+# 核心续期业务逻辑 (JS 函数直接调用版)
 # ==============================================================================
 def renew_host2play(url, proxy_url=None):
     print("启动 Xvfb 虚拟桌面...")
@@ -171,35 +171,33 @@ def renew_host2play(url, proxy_url=None):
         print("⏳ 等待页面加载...")
         time.sleep(3) 
         
-        print("📜 向下滚动页面，准备定位按钮...")
+        print("📜 向下滚动页面...")
         page.scroll.down(500)
         time.sleep(1)
 
-        # 核心修复：使用严格的 XPath 定位，确保只抓取真正的 button 标签
-        print("🔍 寻找精确的 'Renew server' 按钮...")
-        first_renew_btn = page.ele('xpath://button[normalize-space(text())="Renew server"]', timeout=20)
+        # 核心修复 1：利用你 F12 发现的特征，极其精确地定位这个特殊的按钮
+        print("🔍 寻找带有 renew() 函数的按钮...")
+        first_renew_btn = page.ele('xpath://button[contains(@onclick, "renew()")]', timeout=20)
         
         if not first_renew_btn:
-            msg = "❌ 未找到初始的 'Renew server' 按钮 (button 标签)"
+            msg = "❌ 未找到初始的 'Renew server' 按钮 (未发现 renew() 绑定)"
             print(msg)
             page.get_screenshot(path='.', name='error_no_first_btn.png')
             return False, msg
             
-        # 将找出的按钮强制滚动到屏幕视口正中间
-        try:
-            first_renew_btn.scroll.to_see(center=True)
-            time.sleep(1)
-        except Exception as e:
-            print(f"⚠️ 滚动居中时出现小警告(不影响后续): {e}")
-            
-        # ================= 纯物理点击循环 =================
+        # ================= 触发续期弹窗循环 =================
         checkbox_frame = None
         for attempt in range(3):
-            print(f"🖱️ 尝试物理点击初始 'Renew server' 按钮 (第 {attempt+1} 次)...")
+            print(f"⚡ 尝试触发续期弹窗 (第 {attempt+1} 次)...")
             
-            # 严格按照你的指令：只使用物理模拟点击，不再使用 JS 点击
-            human_move_and_click(page, first_renew_btn)
-            time.sleep(5) # 给弹窗多一点点加载时间
+            # 核心修复 2：终极杀招！直接命令浏览器执行网页源码里的 renew() 函数，无视一切物理阻碍！
+            try:
+                page.run_js("if(typeof renew === 'function') { renew(); } else { console.log('没有找到全局 renew 函数'); }")
+                print("💉 已向页面注入并执行 renew() 函数指令")
+            except Exception as e:
+                print(f"⚠️ 执行代码块异常: {e}")
+                
+            time.sleep(5) 
             
             print("🔍 寻找验证码弹窗...")
             checkbox_frame = page.get_frame('@src*:recaptcha/api2/anchor', timeout=6)
@@ -234,7 +232,7 @@ def renew_host2play(url, proxy_url=None):
                     print("✨ 验证秒过！")
                 
                 print("🚀 验证完成，点击弹窗中最终的 Renew 按钮...")
-                # 最终按钮也使用严格的 XPath 物理点击
+                # 最终确认按钮
                 final_renew_btn = page.ele('xpath://button[normalize-space(text())="Renew"]', timeout=10) 
                 
                 if final_renew_btn:
