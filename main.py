@@ -273,4 +273,7 @@ if __name__ == "__main__":
     else:
         tg_msg = f"❌ <b>服务器续期失败</b>\n\n<b>详情：</b>{result_message}\n<b>状态：</b>请登录 GitHub Actions 查看错误日志和截图。"
         
-    send_tg_message(tg_token, tg_chat_id, tg_
+    send_tg_message(tg_token, tg_chat_id, tg_msg)
+    
+    if not is_success:
+        sys.exit(1)
