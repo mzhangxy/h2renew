@@ -143,7 +143,7 @@ def renew_host2play(url, proxy_url=None):
             print("⏳ 等待页面初步加载...")
             time.sleep(6)
 
-            # ==================== 【极致去广告+去遮挡】 ====================
+            # ==================== 【极致去广告 + 去遮挡】 ====================
             print("🧹 执行【Host2Play专用极致去广告+去遮挡】...")
             sb.execute_script("""
                 function removeByText(text) {
@@ -183,7 +183,24 @@ def renew_host2play(url, proxy_url=None):
             """)
             time.sleep(2.5)
 
-            sb.save_screenshot("after_clean_ads.png")   # ← 调试用，下载看广告是否清除
+            # ==================== 【新增】处理 Cookie Consent 弹窗 ====================
+            print("🔒 处理 Cookie Consent 同意弹窗...")
+            sb.save_screenshot("before_consent.png")   # 调试用
+            try:
+                if sb.is_element_visible('button:contains("Consent")'):
+                    sb.uc_click('button:contains("Consent")')
+                    print("✅ 已点击 Consent 按钮（同意隐私政策）")
+                    time.sleep(3)
+                elif sb.is_element_visible('button:has-text("Consent")'):
+                    sb.uc_click('button:has-text("Consent")')
+                    print("✅ 已点击 Consent 按钮（备用选择器）")
+                    time.sleep(3)
+                else:
+                    print("未发现 Consent 按钮，跳过")
+            except Exception as e:
+                print(f"Consent 处理异常（不影响流程）: {e}")
+
+            sb.save_screenshot("after_consent.png")   # 调试用
 
             print("📜 滚动页面让蓝色按钮进入视野...")
             sb.execute_script("window.scrollBy(0, 600);")
@@ -200,7 +217,7 @@ def renew_host2play(url, proxy_url=None):
             clicked = False
             for sel in blue_btn_selectors:
                 print(f"   尝试定位器: {sel}")
-                if sb.is_element_visible(sel):          # ← 已移除 timeout
+                if sb.is_element_visible(sel):
                     sb.scroll_to(sel)
                     time.sleep(1)
                     try:
@@ -234,7 +251,7 @@ def renew_host2play(url, proxy_url=None):
             print("🔍 寻找 reCAPTCHA 验证码弹窗...")
             anchor_iframe_xpath = '//iframe[contains(@src, "recaptcha/api2/anchor")]'
 
-            if sb.is_element_visible(anchor_iframe_xpath):   # ← 已移除 timeout
+            if sb.is_element_visible(anchor_iframe_xpath):
                 print("✅ 成功加载出 reCAPTCHA 验证码框！")
                 sb.switch_to_frame(anchor_iframe_xpath)
                 sb.uc_click('#recaptcha-anchor')
@@ -246,7 +263,7 @@ def renew_host2play(url, proxy_url=None):
                 if checked != 'true':
                     print("🎲 触发验证挑战，调用破解器...")
                     bframe_xpath = '//iframe[contains(@src, "recaptcha/api2/bframe")]'
-                    if sb.is_element_visible(bframe_xpath):   # ← 已移除 timeout
+                    if sb.is_element_visible(bframe_xpath):
                         sb.switch_to_frame(bframe_xpath)
                         solver = RecaptchaAudioSolver(sb)
                         if solver.solve():
@@ -261,7 +278,7 @@ def renew_host2play(url, proxy_url=None):
             if solved_captcha:
                 print("🚀 验证完成，点击最终 Renew...")
                 final_btn = '//button[normalize-space(text())="Renew"]'
-                if sb.is_element_visible(final_btn):      # ← 已移除 timeout
+                if sb.is_element_visible(final_btn):
                     sb.uc_click(final_btn)
                     time.sleep(10)
                     msg = "🎉 续期操作成功！"
