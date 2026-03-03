@@ -141,6 +141,9 @@ class RecaptchaAudioSolver:
 # ==============================================================================
 # 核心续期业务逻辑
 # ==============================================================================
+# ==============================================================================
+# 核心续期业务逻辑 (加入抗广告与重试机制)
+# ==============================================================================
 def renew_host2play(url, proxy_url=None):
     print("启动 Xvfb 虚拟桌面...")
     vdisplay = Xvfb(width=1280, height=720, colordepth=24)
@@ -166,7 +169,6 @@ def renew_host2play(url, proxy_url=None):
         page.get(url)
         
         print("⏳ 等待页面加载...")
-        # 寻找蓝色的初始 Renew server 按钮
         first_renew_btn = page.ele('text:Renew server', timeout=20)
         if not first_renew_btn:
             msg = "❌ 未找到初始的 'Renew server' 按钮"
@@ -174,46 +176,39 @@ def renew_host2play(url, proxy_url=None):
             page.get_screenshot(path='.', name='error_no_first_btn.png')
             return False, msg
             
-        print("🖱️ 点击初始 'Renew server' 按钮...")
-        human_move_and_click(page, first_renew_btn)
-        time.sleep(3)
-        
-        # ================== 加入的检测代码 ==================
-        print("🛠️ [Debug] 开始检测当前页面的弹窗状态...")
-        
-        # 1. 截取点击后的画面，方便在 Github Actions 神器里查看
-        page.get_screenshot(path='.', name='debug_after_first_click.png')
-        
-        # 2. 检查 "Verify that you're not a robot" 文本是否出现
-        verify_text = page.ele("text:Verify that you're not a robot", timeout=2)
-        if verify_text:
-            print("✅ [Debug] 成功检测到 'Verify that you\\'re not a robot' 弹窗文本。")
-        else:
-            print("⚠️ [Debug] 未检测到弹窗文本，可能是点击没生效或者页面卡顿。")
+        # ================= 优化点：抗广告点击循环 =================
+        checkbox_frame = None
+        for attempt in range(3):
+            print(f"🖱️ 尝试点击初始 'Renew server' 按钮 (第 {attempt+1} 次)...")
+            # 使用 JS 点击，直接穿透视觉上的广告层
+            first_renew_btn.click(by_js=True)
+            time.sleep(4)
             
-        # 3. 打印当前页面所有的 iframe，看看 reCAPTCHA 的真实 URL 是什么
-        all_iframes = page.eles('tag:iframe')
-        print(f"📊 [Debug] 当前页面共有 {len(all_iframes)} 个 iframe:")
-        for i, frame in enumerate(all_iframes):
-            src = frame.attr('src')
-            print(f"  [{i+1}] src: {src}")
-        # ====================================================
-        
-        # 寻找弹窗中的 reCAPTCHA
-        print("🔍 寻找验证码弹窗...")
-        checkbox_frame = page.get_frame('@src^https://www.google.com/recaptcha/api2/anchor', timeout=15)
-        
+            print("🔍 寻找验证码弹窗...")
+            # 放宽 src 匹配规则，防止域名变化
+            checkbox_frame = page.get_frame('@src*:recaptcha/api2/anchor', timeout=6)
+            
+            if checkbox_frame:
+                print("✅ 成功加载出 reCAPTCHA 验证码框！")
+                break
+            else:
+                print("⚠️ 未加载出验证码，可能被广告吃掉点击。尝试按下 ESC 关闭广告...")
+                # 模拟按 ESC 键关闭全屏广告
+                page.actions.key_down('ESCAPE').key_up('ESCAPE')
+                time.sleep(2)
+        # ========================================================
+
         if checkbox_frame:
             checkbox = checkbox_frame.ele('#recaptcha-anchor', timeout=10)
             if checkbox:
-                # 点击复选框
+                # 这里的复选框还是用人类轨迹点击比较安全
                 human_move_and_click(page, checkbox)
                 print("🖱️ 已点击复选框，等待响应...")
                 time.sleep(4)
                 
                 if checkbox.attr('aria-checked') != 'true':
                     print("🎲 触发验证挑战，调用破解器...")
-                    challenge_frame = page.get_frame('@src^https://www.google.com/recaptcha/api2/bframe', timeout=10)
+                    challenge_frame = page.get_frame('@src*:recaptcha/api2/bframe', timeout=10)
                     if challenge_frame:
                         solver = RecaptchaAudioSolver(page)
                         if not solver.solve(challenge_frame):
@@ -224,13 +219,12 @@ def renew_host2play(url, proxy_url=None):
                 else:
                     print("✨ 验证秒过！")
                 
-                # 验证通过后，点击弹窗中紫色的 Renew 按钮
                 print("🚀 验证完成，点击弹窗中最终的 Renew 按钮...")
-                # 使用精确匹配 'text=Renew'，避免和外层的 'Renew server' 混淆
                 final_renew_btn = page.ele('text=Renew', timeout=10) 
                 
                 if final_renew_btn:
-                    human_move_and_click(page, final_renew_btn)
+                    # 最后一个按钮也用 JS 点击，防止弹窗层级问题
+                    final_renew_btn.click(by_js=True)
                     print("⏳ 等待续期请求处理...")
                     time.sleep(8) 
                     
@@ -245,8 +239,9 @@ def renew_host2play(url, proxy_url=None):
                 msg = "❌ iframe 中未能找到 reCAPTCHA checkbox"
                 print(msg)
         else:
-            msg = "❌ 未能找到 reCAPTCHA iframe，可能弹窗未加载"
+            msg = "❌ 3次尝试均未能找到 reCAPTCHA iframe，放弃操作。"
             print(msg)
+            page.get_screenshot(path='.', name='error_no_iframe_final.png')
 
     except Exception as e:
         msg = f"💥 执行过程中出现异常: {e}"
