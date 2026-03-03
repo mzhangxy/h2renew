@@ -178,6 +178,27 @@ def renew_host2play(url, proxy_url=None):
         human_move_and_click(page, first_renew_btn)
         time.sleep(3)
         
+        # ================== 加入的检测代码 ==================
+        print("🛠️ [Debug] 开始检测当前页面的弹窗状态...")
+        
+        # 1. 截取点击后的画面，方便在 Github Actions 神器里查看
+        page.get_screenshot(path='.', name='debug_after_first_click.png')
+        
+        # 2. 检查 "Verify that you're not a robot" 文本是否出现
+        verify_text = page.ele("text:Verify that you're not a robot", timeout=2)
+        if verify_text:
+            print("✅ [Debug] 成功检测到 'Verify that you\\'re not a robot' 弹窗文本。")
+        else:
+            print("⚠️ [Debug] 未检测到弹窗文本，可能是点击没生效或者页面卡顿。")
+            
+        # 3. 打印当前页面所有的 iframe，看看 reCAPTCHA 的真实 URL 是什么
+        all_iframes = page.eles('tag:iframe')
+        print(f"📊 [Debug] 当前页面共有 {len(all_iframes)} 个 iframe:")
+        for i, frame in enumerate(all_iframes):
+            src = frame.attr('src')
+            print(f"  [{i+1}] src: {src}")
+        # ====================================================
+        
         # 寻找弹窗中的 reCAPTCHA
         print("🔍 寻找验证码弹窗...")
         checkbox_frame = page.get_frame('@src^https://www.google.com/recaptcha/api2/anchor', timeout=15)
