@@ -195,8 +195,8 @@ def renew_host2play(url, proxy_url=None):
             sb.save_screenshot("after_consent.png")
 
             # ==================== 第一步：点击打开 Renew 弹窗 ====================
-            print("📜 滚动页面...")
-            sb.execute_script("window.scrollBy(0, 650);")
+            print("📜 滚动页面（适中距离）...")
+            sb.execute_script("window.scrollBy(0, 500);")
             time.sleep(1.5)
 
             print("🖱️ 第一步：点击主页面 'Renew server' 打开弹窗...")
@@ -212,11 +212,10 @@ def renew_host2play(url, proxy_url=None):
                 print("✅ 第一步 JS 点击成功")
             time.sleep(3)
 
-            sb.save_screenshot("renew_popup_opened.png")   # 关键调试截图
+            sb.save_screenshot("renew_popup_opened.png")
 
-            # ==================== 第二步：点击弹窗内蓝色按钮（触发 reCAPTCHA） ====================
+            # ==================== 第二步：点击弹窗内按钮（触发 reCAPTCHA） ====================
             print("⏳ 等待确认弹窗完全加载...")
-            # 等待关键文字出现
             for i in range(8):
                 if sb.is_text_visible("Expires in:") or sb.is_text_visible("Deletes on:"):
                     print("✅ 确认弹窗已出现")
@@ -226,7 +225,7 @@ def renew_host2play(url, proxy_url=None):
             print("🖱️ 第二步：点击弹窗内 'Renew server' 按钮（触发 reCAPTCHA）...")
             try:
                 sb.uc_click('button:contains("Renew server")')
-                print("✅ 弹窗内按钮点击成功！reCAPTCHA 应该弹出")
+                print("✅ 弹窗内按钮点击成功！")
             except:
                 sb.execute_script("""
                     document.querySelectorAll('button').forEach(btn => {
@@ -234,16 +233,30 @@ def renew_host2play(url, proxy_url=None):
                     });
                 """)
                 print("✅ 已执行 JS 二次点击")
-            time.sleep(6)   # 给 reCAPTCHA 充分加载时间
+            time.sleep(8)   # ← 关键：给 reCAPTCHA 更多加载时间
 
-            # ==================== 验证码破解部分 ====================
+            # ==================== reCAPTCHA 破解部分（加强等待版） ====================
             solved_captcha = False
             print("🔍 寻找 reCAPTCHA 验证码框...")
             anchor_iframe_xpath = '//iframe[contains(@src, "recaptcha/api2/anchor")]'
 
             if sb.is_element_visible(anchor_iframe_xpath):
-                print("✅ reCAPTCHA 弹出成功！")
+                print("✅ reCAPTCHA iframe 弹出成功！")
                 sb.switch_to_frame(anchor_iframe_xpath)
+                
+                # ←←← 新增：显式等待 checkbox 加载（最关键修复）
+                print("⏳ 等待 reCAPTCHA checkbox 加载（最多20秒）...")
+                sb.save_screenshot("before_checkbox.png")   # 调试用
+                for _ in range(20):
+                    if sb.is_element_visible('#recaptcha-anchor'):
+                        print("✅ reCAPTCHA checkbox 已出现")
+                        sb.save_screenshot("recaptcha_checkbox_ready.png")
+                        break
+                    time.sleep(1)
+                else:
+                    print("⚠️ checkbox 等待超时")
+                    sb.save_screenshot("recaptcha_checkbox_timeout.png")
+
                 sb.uc_click('#recaptcha-anchor')
                 time.sleep(5)
 
@@ -262,7 +275,7 @@ def renew_host2play(url, proxy_url=None):
                 else:
                     solved_captcha = True
             else:
-                print("⚠️ 未发现 reCAPTCHA")
+                print("⚠️ 未发现 reCAPTCHA iframe")
                 sb.save_screenshot(f"debug_no_recaptcha_{int(time.time())}.png")
 
             if solved_captcha:
