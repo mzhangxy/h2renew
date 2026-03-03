@@ -139,7 +139,7 @@ class RecaptchaAudioSolver:
         except: return None
 
 # ==============================================================================
-# 核心续期业务逻辑 (JS 深度抓错版)
+# 核心续期业务逻辑 (纯物理点击 + 错误自愈版)
 # ==============================================================================
 def renew_host2play(url, proxy_url=None):
     print("启动 Xvfb 虚拟桌面...")
@@ -165,51 +165,54 @@ def renew_host2play(url, proxy_url=None):
         print(f"🌐 访问续期目标网址: {url}")
         page.get(url)
         
-        print("⏳ 等待页面加载...")
-        time.sleep(3) 
-        
-        print("📜 向下滚动页面...")
-        page.scroll.down(500)
-        time.sleep(1)
-
-        print("🔍 寻找带有 renew() 函数的按钮...")
-        first_renew_btn = page.ele('xpath://button[contains(@onclick, "renew()")]', timeout=20)
-        
-        if not first_renew_btn:
-            msg = "❌ 未找到初始的 'Renew server' 按钮 (未发现 renew() 绑定)"
-            print(msg)
-            page.get_screenshot(path='.', name='error_no_first_btn.png')
-            return False, msg
-            
-        # ================= 触发续期弹窗循环 =================
+        # ================= 触发续期弹窗循环 (加入自愈机制) =================
         checkbox_frame = None
         for attempt in range(3):
-            print(f"⚡ 尝试触发续期弹窗 (第 {attempt+1} 次)...")
+            print(f"\n⚡ 第 {attempt+1} 次尝试获取验证码弹窗...")
+            print("⏳ 等待页面加载...")
+            time.sleep(3) 
             
-            # 核心排查：加入 try-catch 捕获浏览器端的真实报错并传回 Python
-            js_debug_code = """
-            try {
-                if (typeof renew === 'function') {
-                    renew();
-                    return "SUCCESS: 全局 renew() 执行完成";
-                } else if (typeof window.renew === 'function') {
-                    window.renew();
-                    return "SUCCESS: window.renew() 执行完成";
-                } else {
-                    return "ERROR: 找不到 renew 函数，typeof renew 结果是: " + typeof renew;
-                }
-            } catch (e) {
-                return "EXCEPTION 报错抓取: " + e.name + " - " + e.message;
-            }
-            """
-            try:
-                # 获取 js 的 return 结果
-                js_result = page.run_js(js_debug_code)
-                print(f"🔬 [JS Debug] 网页控制台返回结果: {js_result}")
-            except Exception as e:
-                print(f"⚠️ [JS Debug] Python 执行代码时发生异常: {e}")
+            print("📜 向下滚动页面...")
+            page.scroll.down(500)
+            time.sleep(1)
+
+            print("🔍 寻找精确的 'Renew server' 按钮...")
+            first_renew_btn = page.ele('xpath://button[normalize-space(text())="Renew server"]', timeout=15)
+            
+            if not first_renew_btn:
+                msg = "❌ 未找到初始的 'Renew server' 按钮 (button 标签)"
+                print(msg)
+                # 应对极端情况：如果一开始就显示了报错页面，尝试点刷新
+                refresh_btn = page.ele('text:Refresh page', timeout=2)
+                if refresh_btn:
+                    print("🔄 发现 'Refresh page' 按钮，正在点击重置页面状态...")
+                    human_move_and_click(page, refresh_btn)
+                    time.sleep(5)
+                    continue
+                else:
+                    page.get_screenshot(path='.', name=f'error_no_first_btn_{attempt}.png')
+                    break # 真的找不到，跳出循环
                 
-            time.sleep(5) 
+            # 将找出的按钮强制滚动到屏幕视口正中间
+            try:
+                first_renew_btn.scroll.to_see(center=True)
+                time.sleep(1)
+            except Exception as e:
+                print(f"⚠️ 滚动居中时出现小警告(不影响后续): {e}")
+                
+            print(f"🖱️ 尝试物理点击初始 'Renew server' 按钮...")
+            human_move_and_click(page, first_renew_btn)
+            time.sleep(5) # 给弹窗或者报错提示加载的时间
+            
+            # --- 新增的错误自愈检测机制 ---
+            # 检测是否出现了 500 Internal Server Error 导致的 Refresh page 按钮
+            refresh_btn = page.ele('text:Refresh page', timeout=3)
+            if refresh_btn:
+                print("💥 检测到服务器内部错误 (Internal server error)！")
+                print("🔄 正在点击 'Refresh page' 按钮进行自愈重试...")
+                human_move_and_click(page, refresh_btn)
+                time.sleep(5)
+                continue # 刷新后，直接进入下一次循环重试
             
             print("🔍 寻找验证码弹窗...")
             checkbox_frame = page.get_frame('@src*:recaptcha/api2/anchor', timeout=6)
@@ -289,7 +292,7 @@ if __name__ == "__main__":
     tg_token = os.getenv("TG_TOKEN")
     tg_chat_id = os.getenv("TG_CHAT_ID")
     
-    proxy_url = 127.0.0.1:10808 
+    proxy_url = "http://127.0.0.1:10808" 
     
     if not renew_url:
         error_msg = "❌ 未找到环境变量 RENEW_URL，程序退出。请在 GitHub Secrets 中配置。"
