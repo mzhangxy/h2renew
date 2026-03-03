@@ -139,39 +139,88 @@ def renew_host2play(url, proxy_url=None):
             print("⏳ 等待页面初步加载...")
             time.sleep(6) 
 
-            print("🧹 正在清理页面广告干扰...")
+                        print("🧹 执行【Host2Play专用极致去广告+去遮挡】...")
             sb.execute_script("""
-                const selectors = ['iframe[src*="googleads"]', 'ins.adsbygoogle', 'div[id^="google_ads"]', '.ad-container', '#dismiss-button'];
-                selectors.forEach(s => document.querySelectorAll(s).forEach(el => el.remove()));
-            """)
-            
-            print("📜 向下滚动页面...")
-            sb.execute_script("window.scrollBy(0, 480);")
-            time.sleep(2)
+                // 1. 删除所有已知广告和浮层（包括AI Coding横幅）
+                const badSelectors = [
+                    'div:has-text("AI Coding in Your Stack")',
+                    'div:has-text("Learn More")',
+                    'ins.adsbygoogle', 
+                    'iframe[src*="ads"]', 
+                    '[class*="ad-"]',
+                    '[id*="google"]',
+                    '[style*="z-index: 9999"]',
+                    'div[style*="position: fixed"]',
+                    '.modal-backdrop',
+                    '[class*="overlay"]'
+                ];
+                badSelectors.forEach(sel => {
+                    document.querySelectorAll(sel).forEach(el => {
+                        el.style.display = 'none';
+                        el.style.visibility = 'hidden';
+                        el.remove();
+                    });
+                });
 
-            first_btn_xpath = '//button[normalize-space(text())="Renew server"]'
+                // 2. 把所有高z-index遮挡层强行拉低（解决广告覆盖蓝色按钮）
+                document.querySelectorAll('*').forEach(el => {
+                    const z = parseInt(window.getComputedStyle(el).zIndex || '0');
+                    if (z > 50) {
+                        el.style.zIndex = '10';
+                        el.style.pointerEvents = 'none';
+                    }
+                });
+            """)
+            time.sleep(2.5)
+
+            print("📜 滚动页面让蓝色按钮进入视野...")
+            sb.execute_script("window.scrollBy(0, 600);")
+            time.sleep(1.5)
+
+            # === 核心：点击主页面蓝色 "Renew server" 按钮（触发 reCAPTCHA）===
+            print("🖱️ 尝试点击蓝色 'Renew server' 按钮...")
+            blue_btn_selectors = [
+                'button:contains("Renew server")',           # SeleniumBase 最强文本定位
+                '//button[contains(text(), "Renew server")]', # XPath 精确匹配（不含冒号）
+                'button:has-text("Renew server")'            # 备用文本选择器
+            ]
+
+            clicked = False
+            for sel in blue_btn_selectors:
+                print(f"   尝试定位器: {sel}")
+                if sb.is_element_visible(sel, timeout=6):
+                    sb.scroll_to(sel)
+                    time.sleep(0.8)
+                    try:
+                        sb.uc_click(sel)          # UC模式专用点击（防检测）
+                        print("✅ uc_click 成功！reCAPTCHA 应该弹出")
+                        clicked = True
+                        break
+                    except:
+                        try:
+                            sb.execute_script("arguments[0].click();", sb.get_element(sel))
+                            print("✅ JS click 成功")
+                            clicked = True
+                            break
+                        except:
+                            continue
+                else:
+                    print("   未找到，继续下一个定位器")
+
+            if not clicked:
+                # 最终核弹级后备：全局搜索文字并强制点击
+                print("⚠️ 常规定位失败，执行核弹JS强制点击...")
+                sb.execute_script("""
+                    document.querySelectorAll('button').forEach(btn => {
+                        if (btn.textContent.trim() === 'Renew server') {
+                            btn.click();
+                        }
+                    });
+                """)
+                time.sleep(4)
+                print("✅ 已执行强制JS点击")
             
-            solved_captcha = False
-            for attempt in range(3):
-                print(f"\n⚡ 第 {attempt+1} 次尝试获取验证码弹窗...")
-                
-                if not sb.is_element_visible(first_btn_xpath):
-                    print("⚠️ 按钮不可见，尝试刷新...")
-                    sb.refresh()
-                    time.sleep(6)
-                    sb.execute_script("window.scrollBy(0, 480);")
-                        
-                print(f"🖱️ 尝试物理点击初始 'Renew server' 按钮...")
-                try:
-                    # 尝试先聚焦再点击
-                    sb.focus(first_btn_xpath)
-                    time.sleep(1)
-                    sb.uc_click(first_btn_xpath)
-                except Exception as e:
-                    print(f"⚠️ 点击异常，尝试 JS 备用点击: {e}")
-                    sb.execute_script(f"document.evaluate('{first_btn_xpath}', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue.click();")
-                
-                time.sleep(7) # 增加等待弹窗的时间
+
                 
                 print("🔍 寻找验证码弹窗...")
                 anchor_iframe_xpath = '//iframe[contains(@src, "recaptcha/api2/anchor")]'
