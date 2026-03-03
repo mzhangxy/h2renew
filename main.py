@@ -289,7 +289,7 @@ if __name__ == "__main__":
     tg_token = os.getenv("TG_TOKEN")
     tg_chat_id = os.getenv("TG_CHAT_ID")
     
-    proxy_url = None 
+    proxy_url = 127.0.0.1:10808 
     
     if not renew_url:
         error_msg = "❌ 未找到环境变量 RENEW_URL，程序退出。请在 GitHub Secrets 中配置。"
