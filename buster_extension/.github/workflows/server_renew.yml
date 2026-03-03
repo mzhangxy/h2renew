@@ -1,0 +1,33 @@
+name: Auto Renew Server
+
+# 触发条件
+on:
+  workflow_dispatch: # 允许你在 GitHub 网页上手动点击运行按钮
+  schedule:
+    - cron: '0 8 * * *' # 每天 UTC 时间 8:00 (北京时间 16:00) 自动运行一次，你可以以后再调整
+
+jobs:
+  renew-job:
+    runs-on: ubuntu-latest # 使用最新的 Ubuntu 虚拟服务器
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4 # 把你仓库里的代码和 buster_extension 插件拉取到服务器上
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11' # 安装 Python 3.11 环境
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install seleniumbase # 安装我们需要的浏览器自动化库
+
+      - name: Run Auto Renew Script
+        env:
+          # 把我们在 GitHub Secrets 里配置的多账户 JSON 字符串，作为环境变量传给 Python 脚本
+          ACCOUNTS_DATA: ${{ secrets.ACCOUNTS_DATA }} 
+        run: |
+          # 运行你的 Python 脚本
+          python main.py
