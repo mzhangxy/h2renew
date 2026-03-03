@@ -13,26 +13,29 @@ except ImportError:
     pass
 
 # ==============================================================================
-# Telegram 通知模块
+# Telegram 通知模块 (修复 400 错误版)
 # ==============================================================================
 def send_tg_message(token, chat_id, message):
-    """发送 Telegram 通知"""
+    """发送 Telegram 通知，增加安全过滤"""
     if not token or not chat_id:
         print("未配置 TG_TOKEN 或 TG_CHAT_ID，跳过通知。")
         return
     
     url = f"https://api.telegram.org/bot{token}/sendMessage"
+    # 移除 HTML 标签或确保格式简单，避免解析错误
+    safe_message = message.replace('<b>', '').replace('</b>', '')
+    
     payload = {
         "chat_id": chat_id,
-        "text": message,
-        "parse_mode": "HTML"
+        "text": safe_message,
+        "parse_mode": "None" # 临时改用纯文本模式确保送达
     }
     try:
         response = requests.post(url, json=payload, timeout=10)
         if response.status_code == 200:
             print("✅ Telegram 通知发送成功！")
         else:
-            print(f"❌ Telegram 通知发送失败，状态码: {response.status_code}")
+            print(f"❌ Telegram 通知发送失败，状态码: {response.status_code}, 响应: {response.text}")
     except Exception as e:
         print(f"❌ Telegram 通知请求异常: {e}")
 
@@ -116,6 +119,9 @@ class RecaptchaAudioSolver:
         except: 
             return None
 
+# ==============================================================================
+# 核心续期业务逻辑 (SeleniumBase 稳定增强版)
+# ==============================================================================
 def renew_host2play(url, proxy_url=None):
     print("启动 Xvfb 虚拟桌面...")
     vdisplay = Xvfb(width=1280, height=720, colordepth=24)
@@ -125,23 +131,23 @@ def renew_host2play(url, proxy_url=None):
     msg = ""
     
     try:
+        # 使用更长的延迟和更强的探测模式
         with SB(uc=True, proxy=proxy_url, headless=False, browser="chrome") as sb:
             print(f"🌐 访问续期目标网址: {url}")
-            sb.uc_open_with_reconnect(url, 4) 
+            sb.uc_open_with_reconnect(url, 5) 
             
-            print("⏳ 等待页面加载...")
-            time.sleep(5) 
+            print("⏳ 等待页面初步加载...")
+            time.sleep(6) 
 
-            # --- 新增：清理广告干扰 ---
             print("🧹 正在清理页面广告干扰...")
             sb.execute_script("""
-                const selectors = ['iframe[src*="googleads"]', 'ins.adsbygoogle', 'div[id^="google_ads"]', '.ad-container'];
+                const selectors = ['iframe[src*="googleads"]', 'ins.adsbygoogle', 'div[id^="google_ads"]', '.ad-container', '#dismiss-button'];
                 selectors.forEach(s => document.querySelectorAll(s).forEach(el => el.remove()));
             """)
             
             print("📜 向下滚动页面...")
-            sb.execute_script("window.scrollBy(0, 450);")
-            time.sleep(1)
+            sb.execute_script("window.scrollBy(0, 480);")
+            time.sleep(2)
 
             first_btn_xpath = '//button[normalize-space(text())="Renew server"]'
             
@@ -150,25 +156,31 @@ def renew_host2play(url, proxy_url=None):
                 print(f"\n⚡ 第 {attempt+1} 次尝试获取验证码弹窗...")
                 
                 if not sb.is_element_visible(first_btn_xpath):
+                    print("⚠️ 按钮不可见，尝试刷新...")
                     sb.refresh()
-                    time.sleep(5)
-                    sb.execute_script("window.scrollBy(0, 450);")
+                    time.sleep(6)
+                    sb.execute_script("window.scrollBy(0, 480);")
                         
-                print(f"🖱️ 尝试点击初始 'Renew server' 按钮...")
-                # 使用普通点击与 uc_click 结合，并增加点击后的等待
-                sb.click(first_btn_xpath) 
-                time.sleep(6) 
+                print(f"🖱️ 尝试物理点击初始 'Renew server' 按钮...")
+                try:
+                    # 尝试先聚焦再点击
+                    sb.focus(first_btn_xpath)
+                    time.sleep(1)
+                    sb.uc_click(first_btn_xpath)
+                except Exception as e:
+                    print(f"⚠️ 点击异常，尝试 JS 备用点击: {e}")
+                    sb.execute_script(f"document.evaluate('{first_btn_xpath}', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue.click();")
+                
+                time.sleep(7) # 增加等待弹窗的时间
                 
                 print("🔍 寻找验证码弹窗...")
                 anchor_iframe_xpath = '//iframe[contains(@src, "recaptcha/api2/anchor")]'
                 
                 if sb.is_element_visible(anchor_iframe_xpath):
                     print("✅ 成功加载出 reCAPTCHA 验证码框！")
-                    
                     sb.switch_to_frame(anchor_iframe_xpath)
-                    print("🖱️ 物理点击验证码复选框...")
                     sb.uc_click('#recaptcha-anchor')
-                    time.sleep(4)
+                    time.sleep(5)
                     
                     checked = sb.get_attribute('#recaptcha-anchor', 'aria-checked')
                     sb.switch_to_default_content() 
@@ -176,42 +188,38 @@ def renew_host2play(url, proxy_url=None):
                     if checked != 'true':
                         print("🎲 触发验证挑战，调用破解器...")
                         bframe_xpath = '//iframe[contains(@src, "recaptcha/api2/bframe")]'
-                        if sb.is_element_present(bframe_xpath): # 使用 is_element_present 兼容隐藏 iframe
+                        if sb.is_element_visible(bframe_xpath):
                             sb.switch_to_frame(bframe_xpath)
                             solver = RecaptchaAudioSolver(sb)
                             if not solver.solve():
-                                msg = "❌ 破解未能通过"
+                                msg = "❌ 验证破解失败"
                                 sb.switch_to_default_content()
-                                return False, msg
+                                continue
                             sb.switch_to_default_content() 
-                    else:
-                        print("✨ 验证秒过！")
-                        
+                    
                     solved_captcha = True
                     break
                 else:
-                    print("⚠️ 未加载出验证码弹窗。尝试按 ESC 并微调滚动...")
+                    print("⚠️ 未发现弹窗，记录截图...")
+                    sb.save_screenshot(f'debug_click_attempt_{attempt}.png')
                     sb.press_keys('body', '\x1b') 
-                    sb.execute_script("window.scrollBy(0, 100);")
                     time.sleep(2)
 
             if solved_captcha:
-                print("🚀 验证完成，点击弹窗中最终的 Renew 按钮...")
-                final_renew_btn_xpath = '//button[normalize-space(text())="Renew"]'
-                
-                if sb.is_element_visible(final_renew_btn_xpath):
-                    sb.uc_click(final_renew_btn_xpath)
-                    print("⏳ 等待续期请求处理...")
-                    time.sleep(8) 
-                    msg = "🎉 恭喜！服务器续期操作成功执行。"
+                print("🚀 验证完成，点击最终 Renew...")
+                final_btn = '//button[normalize-space(text())="Renew"]'
+                if sb.is_element_visible(final_btn):
+                    sb.uc_click(final_btn)
+                    time.sleep(10)
+                    msg = "🎉 续期操作成功！"
                     success = True
                 else:
                     msg = "❌ 找不到最终 Renew 按钮"
             else:
-                msg = "❌ 3次尝试均未能找到 reCAPTCHA iframe"
+                msg = "❌ 无法唤出验证码弹窗"
 
     except Exception as e:
-        msg = f"💥 执行过程中出现异常: {e}"
+        msg = f"💥 运行异常: {str(e)[:100]}"
     finally:
         vdisplay.stop()
         return success, msg
