@@ -143,10 +143,9 @@ def renew_host2play(url, proxy_url=None):
             print("⏳ 等待页面初步加载...")
             time.sleep(6)
 
-            # ==================== 【修复后的极致去广告】 ====================
+            # ==================== 【极致去广告+去遮挡】 ====================
             print("🧹 执行【Host2Play专用极致去广告+去遮挡】...")
             sb.execute_script("""
-                // 用纯 JS 方式删除包含特定文字的元素（兼容所有浏览器）
                 function removeByText(text) {
                     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
                     let node;
@@ -161,16 +160,10 @@ def renew_host2play(url, proxy_url=None):
                 removeByText('AI Coding in Your Stack');
                 removeByText('Learn More');
 
-                // 其他标准 CSS 选择器（保持不变）
                 const cssSelectors = [
-                    'ins.adsbygoogle',
-                    'iframe[src*="ads"]',
-                    '[class*="ad-"]',
-                    '[id*="google"]',
-                    '[style*="z-index: 9999"]',
-                    'div[style*="position: fixed"]',
-                    '.modal-backdrop',
-                    '[class*="overlay"]'
+                    'ins.adsbygoogle', 'iframe[src*="ads"]', '[class*="ad-"]',
+                    '[id*="google"]', '[style*="z-index: 9999"]',
+                    'div[style*="position: fixed"]', '.modal-backdrop', '[class*="overlay"]'
                 ];
                 cssSelectors.forEach(sel => {
                     document.querySelectorAll(sel).forEach(el => {
@@ -180,7 +173,6 @@ def renew_host2play(url, proxy_url=None):
                     });
                 });
 
-                // 强制拉低所有遮挡层 z-index
                 document.querySelectorAll('*').forEach(el => {
                     const z = parseInt(window.getComputedStyle(el).zIndex || '0');
                     if (z > 50) {
@@ -191,8 +183,7 @@ def renew_host2play(url, proxy_url=None):
             """)
             time.sleep(2.5)
 
-            # 保存清理后的截图（便于你检查广告是否真的被去掉）
-            sb.save_screenshot("after_clean_ads.png")
+            sb.save_screenshot("after_clean_ads.png")   # ← 调试用，下载看广告是否清除
 
             print("📜 滚动页面让蓝色按钮进入视野...")
             sb.execute_script("window.scrollBy(0, 600);")
@@ -201,15 +192,15 @@ def renew_host2play(url, proxy_url=None):
             # === 点击主页面蓝色 "Renew server" 按钮 ===
             print("🖱️ 尝试点击蓝色 'Renew server' 按钮...")
             blue_btn_selectors = [
-                '//button[contains(text(), "Renew server")]',   # XPath 最稳
-                'button:has-text("Renew server")',             # SB 扩展语法（保留备用）
+                '//button[contains(text(), "Renew server")]',
+                'button:has-text("Renew server")',
                 'button:contains("Renew server")'
             ]
 
             clicked = False
             for sel in blue_btn_selectors:
                 print(f"   尝试定位器: {sel}")
-                if sb.is_element_visible(sel, timeout=8):
+                if sb.is_element_visible(sel):          # ← 已移除 timeout
                     sb.scroll_to(sel)
                     time.sleep(1)
                     try:
@@ -238,12 +229,12 @@ def renew_host2play(url, proxy_url=None):
                 time.sleep(4)
                 print("✅ 已执行强制JS点击")
 
-            # ==================== 验证码部分（保持你原来的逻辑）================
+            # ==================== 验证码部分 ====================
             solved_captcha = False
             print("🔍 寻找 reCAPTCHA 验证码弹窗...")
             anchor_iframe_xpath = '//iframe[contains(@src, "recaptcha/api2/anchor")]'
 
-            if sb.is_element_visible(anchor_iframe_xpath, timeout=15):
+            if sb.is_element_visible(anchor_iframe_xpath):   # ← 已移除 timeout
                 print("✅ 成功加载出 reCAPTCHA 验证码框！")
                 sb.switch_to_frame(anchor_iframe_xpath)
                 sb.uc_click('#recaptcha-anchor')
@@ -255,7 +246,7 @@ def renew_host2play(url, proxy_url=None):
                 if checked != 'true':
                     print("🎲 触发验证挑战，调用破解器...")
                     bframe_xpath = '//iframe[contains(@src, "recaptcha/api2/bframe")]'
-                    if sb.is_element_visible(bframe_xpath, timeout=10):
+                    if sb.is_element_visible(bframe_xpath):   # ← 已移除 timeout
                         sb.switch_to_frame(bframe_xpath)
                         solver = RecaptchaAudioSolver(sb)
                         if solver.solve():
@@ -270,7 +261,7 @@ def renew_host2play(url, proxy_url=None):
             if solved_captcha:
                 print("🚀 验证完成，点击最终 Renew...")
                 final_btn = '//button[normalize-space(text())="Renew"]'
-                if sb.is_element_visible(final_btn, timeout=10):
+                if sb.is_element_visible(final_btn):      # ← 已移除 timeout
                     sb.uc_click(final_btn)
                     time.sleep(10)
                     msg = "🎉 续期操作成功！"
