@@ -13,7 +13,7 @@ except ImportError:
     pass
 
 # ==============================================================================
-# Telegram 通知模块 (新增)
+# Telegram 通知模块
 # ==============================================================================
 def send_tg_message(token, chat_id, message):
     """发送 Telegram 通知"""
@@ -37,7 +37,7 @@ def send_tg_message(token, chat_id, message):
         print(f"❌ Telegram 通知请求异常: {e}")
 
 # ==============================================================================
-# 模拟人类行为辅助函数 (完全保留你的原代码)
+# 模拟人类行为辅助函数
 # ==============================================================================
 def human_type(element, text):
     """模拟人类点击输入框并逐字输入文字"""
@@ -61,7 +61,7 @@ def human_move_and_click(page, element):
         element.click()
 
 # ==============================================================================
-# 语音验证码破解模块 (完全保留你的原代码)
+# 语音验证码破解模块
 # ==============================================================================
 class RecaptchaAudioSolver:
     def __init__(self, page):
@@ -137,8 +137,9 @@ class RecaptchaAudioSolver:
                             iframe_ele.ele('xpath://a[contains(@href, ".mp3")]')
             return download_link.attr('href') if download_link else None
         except: return None
-    # ==============================================================================
-# 核心续期业务逻辑 (第二步)
+
+# ==============================================================================
+# 核心续期业务逻辑
 # ==============================================================================
 def renew_host2play(url, proxy_url=None):
     print("启动 Xvfb 虚拟桌面...")
@@ -165,7 +166,7 @@ def renew_host2play(url, proxy_url=None):
         page.get(url)
         
         print("⏳ 等待页面加载...")
-        # 匹配图 1：找到蓝色的 Renew server 按钮
+        # 寻找蓝色的初始 Renew server 按钮
         first_renew_btn = page.ele('text:Renew server', timeout=20)
         if not first_renew_btn:
             msg = "❌ 未找到初始的 'Renew server' 按钮"
@@ -184,13 +185,13 @@ def renew_host2play(url, proxy_url=None):
         if checkbox_frame:
             checkbox = checkbox_frame.ele('#recaptcha-anchor', timeout=10)
             if checkbox:
-                # 匹配图 2：点击复选框
+                # 点击复选框
                 human_move_and_click(page, checkbox)
                 print("🖱️ 已点击复选框，等待响应...")
                 time.sleep(4)
                 
                 if checkbox.attr('aria-checked') != 'true':
-                    print("🎲 触发验证挑战，调用你的破解器...")
+                    print("🎲 触发验证挑战，调用破解器...")
                     challenge_frame = page.get_frame('@src^https://www.google.com/recaptcha/api2/bframe', timeout=10)
                     if challenge_frame:
                         solver = RecaptchaAudioSolver(page)
@@ -202,15 +203,15 @@ def renew_host2play(url, proxy_url=None):
                 else:
                     print("✨ 验证秒过！")
                 
-                # 匹配图 3：验证通过后，点击弹窗中最终的 Renew 按钮
+                # 验证通过后，点击弹窗中紫色的 Renew 按钮
                 print("🚀 验证完成，点击弹窗中最终的 Renew 按钮...")
-                # 使用 xpath 精确定位只包含 "Renew" 但不包含 "server" 的按钮，防止点错
-                final_renew_btn = page.ele('xpath://button[contains(., "Renew") and not(contains(., "server"))]', timeout=10) 
+                # 使用精确匹配 'text=Renew'，避免和外层的 'Renew server' 混淆
+                final_renew_btn = page.ele('text=Renew', timeout=10) 
                 
                 if final_renew_btn:
                     human_move_and_click(page, final_renew_btn)
                     print("⏳ 等待续期请求处理...")
-                    time.sleep(8) # 等待页面刷新加载图 4 的状态
+                    time.sleep(8) 
                     
                     msg = "🎉 恭喜！服务器续期操作成功执行，时间已延长。"
                     print(msg)
@@ -240,17 +241,15 @@ def renew_host2play(url, proxy_url=None):
         vdisplay.stop()
         print("Xvfb 虚拟桌面已关闭。")
         return success, msg
-    # ==============================================================================
-# 程序主入口 (第三步)
+
+# ==============================================================================
+# 程序主入口
 # ==============================================================================
 if __name__ == "__main__":
-    # 从环境变量中读取配置
     renew_url = os.getenv("RENEW_URL")
     tg_token = os.getenv("TG_TOKEN")
     tg_chat_id = os.getenv("TG_CHAT_ID")
     
-    # GitHub Actions 的服务器通常不需要代理即可访问外网，这里默认设为 None
-    # 如果后续发现被拦截，我们可以再把代理加回来
     proxy_url = None 
     
     if not renew_url:
@@ -261,18 +260,14 @@ if __name__ == "__main__":
         
     print("🚀 开始执行自动续期任务...")
     
-    # 调用续期核心逻辑
     is_success, result_message = renew_host2play(renew_url, proxy_url)
     
-    # 格式化 Telegram 通知内容
     if is_success:
         tg_msg = f"✅ <b>服务器续期成功</b>\n\n<b>详情：</b>{result_message}\n<b>状态：</b>时间已成功延长 8 小时。"
     else:
         tg_msg = f"❌ <b>服务器续期失败</b>\n\n<b>详情：</b>{result_message}\n<b>状态：</b>请登录 GitHub Actions 查看错误日志和截图。"
         
-    # 发送通知
     send_tg_message(tg_token, tg_chat_id, tg_msg)
     
-    # 如果失败，让 GitHub Actions 的状态也显示为失败 (红叉)
     if not is_success:
         sys.exit(1)
