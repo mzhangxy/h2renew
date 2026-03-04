@@ -158,7 +158,7 @@ class RecaptchaAudioSolver:
             return None
 
 # ==============================================================================
-# 核心续期业务逻辑
+# 核心续期逻辑
 # ==============================================================================
 def renew_host2play(url, proxy_url=None):
     print("启动 Xvfb 虚拟桌面...")
@@ -232,7 +232,7 @@ def renew_host2play(url, proxy_url=None):
             time.sleep(3)
 
         # 🚨 植入“热身”逻辑，积累人类交互数据
-        print("🤸 开始战前热身（积累真实的鼠标轨迹和滚动数据）...")
+        print("🤸 积累真实的鼠标轨迹和滚动数据...")
         for _ in range(3):
             scroll_y = random.randint(200, 600)
             page.scroll.down(scroll_y)
@@ -297,7 +297,7 @@ def renew_host2play(url, proxy_url=None):
                 print("✅ reCAPTCHA 已自动验证通过！")
                 solved_captcha = True
             else:
-                print("🎲 需要手动破解音频验证码...")
+                print("🎲 破解音频验证码...")
                 bframe = page.get_frame('xpath://iframe[contains(@src, "recaptcha/api2/bframe")]', timeout=5)
                 if bframe:
                     solver = RecaptchaAudioSolver(page)
@@ -309,7 +309,7 @@ def renew_host2play(url, proxy_url=None):
             msg = "❌ 未找到 reCAPTCHA 验证码区域，请检查截图。"
 
         if solved_captcha:
-            print("🚀 验证完成，点击最终 Renew...")
+            print("🚀 验证完成，点击 Renew...")
             final_btn = page.ele('xpath://button[normalize-space(text())="Renew"]', timeout=3)
             if final_btn:
                 try:
