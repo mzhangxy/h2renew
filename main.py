@@ -306,7 +306,7 @@ def renew_host2play(url, proxy_url=None):
         else:
             if "操作成功" not in msg: # 避免覆盖上面具体的报错信息
                 msg = "❌ 无法通过 reCAPTCHA"
-                page.get_screenshot(path='.', name='error_captcha_failed.png'
+                page.get_screenshot(path='.', name='error_captcha_failed.png')
 
     except Exception as e:
         msg = f"💥 运行异常: {str(e)[:200]}"
