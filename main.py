@@ -195,7 +195,7 @@ def renew_host2play(url, proxy_url=None):
 
         page = ChromiumPage(co)
 
-        # 🚨 方案一：在请求任何页面之前，注入底层指纹欺骗脚本
+        # 在请求任何页面之前，注入底层指纹欺骗脚本
         print("🛡️ 注入 WebGL 硬件欺骗与反侦察指纹...")
         page.add_init_js("""
             // 伪装 WebGL 显卡指纹为常见的 Intel 集显
@@ -231,7 +231,7 @@ def renew_host2play(url, proxy_url=None):
             consent_btn.click()
             time.sleep(3)
 
-        # 🚨 方案二：植入“战前热身”逻辑，积累人类交互数据
+        # 🚨 植入“热身”逻辑，积累人类交互数据
         print("🤸 开始战前热身（积累真实的鼠标轨迹和滚动数据）...")
         for _ in range(3):
             scroll_y = random.randint(200, 600)
@@ -240,7 +240,6 @@ def renew_host2play(url, proxy_url=None):
             # 随机移动鼠标到一个安全的空白区域
             page.actions.move(random.randint(100, 800), random.randint(100, 500))
             time.sleep(random.uniform(0.5, 1.0))
-        page.scroll.to_top()
         time.sleep(random.uniform(1.0, 2.0))
 
         print("🖱️ 打开续期弹窗...")
