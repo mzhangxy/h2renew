@@ -282,7 +282,11 @@ def renew_host2play(url, proxy_url=None):
             
             if not anchor_box:
                 msg = "❌ reCAPTCHA checkbox 超时"
-                page.get_screenshot(path='.', name='error_anchor_timeout.png')
+                try:
+                    time.sleep(2)
+                    page.get_screenshot(path='.', name='error_anchor_timeout.png', full_page=False)
+                except Exception as ss_err:
+                    print(f"⚠️ 截图失败: {ss_err}")
                 return success, msg
 
             print("🖱️ 物理模拟点击 reCAPTCHA checkbox...")
@@ -305,7 +309,11 @@ def renew_host2play(url, proxy_url=None):
                         solved_captcha = True
         else:
             print("⚠️ 未发现 reCAPTCHA iframe")
-            page.get_screenshot(path='.', name='error_no_iframe.png')
+            try:
+                time.sleep(2)
+                page.get_screenshot(path='.', name='error_no_iframe.png', full_page=False)
+            except Exception as ss_err:
+                print(f"⚠️ 截图失败: {ss_err}")
             msg = "❌ 未找到 reCAPTCHA 验证码区域，请检查截图。"
 
         if solved_captcha:
@@ -321,11 +329,20 @@ def renew_host2play(url, proxy_url=None):
                 success = True
             else:
                 msg = "❌ 找不到最终 Renew 按钮"
-                page.get_screenshot(path='.', name='error_no_final_btn.png')
+                try:
+                    time.sleep(2)
+                    page.get_screenshot(path='.', name='error_no_final_btn.png', full_page=False)
+                except Exception as ss_err:
+                    print(f"⚠️ 截图失败: {ss_err}")
+            
         else:
             if "操作成功" not in msg:
                 msg = "❌ 无法通过 reCAPTCHA"
-                page.get_screenshot(path='.', name='error_captcha_failed.png')
+                try:
+                    time.sleep(2)
+                    page.get_screenshot(path='.', name='error_captcha_failed.png', full_page=False)
+                except Exception as ss_err:
+                    print(f"⚠️ 截图失败: {ss_err}")
 
     except Exception as e:
         msg = f"💥 运行异常: {str(e)[:200]}"
