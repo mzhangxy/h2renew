@@ -235,7 +235,7 @@ def renew_host2play(url, proxy_url=None):
                 print("✅ 已执行 JS 二次点击")
             time.sleep(8)   # ← 关键：给 reCAPTCHA 更多加载时间
 
-            # ==================== reCAPTCHA 破解部分（加强等待版） ====================
+            # ==================== reCAPTCHA 破解部分（加强等待版） ===================
             solved_captcha = False
             print("🔍 寻找 reCAPTCHA 验证码框...")
             anchor_iframe_xpath = '//iframe[contains(@src, "recaptcha/api2/anchor")]'
@@ -243,10 +243,9 @@ def renew_host2play(url, proxy_url=None):
             if sb.is_element_visible(anchor_iframe_xpath):
                 print("✅ reCAPTCHA iframe 弹出成功！")
                 sb.switch_to_frame(anchor_iframe_xpath)
-                
-                # ←←← 新增：显式等待 checkbox 加载（最关键修复）
+
                 print("⏳ 等待 reCAPTCHA checkbox 加载（最多20秒）...")
-                sb.save_screenshot("before_checkbox.png")   # 调试用
+                sb.save_screenshot("before_checkbox.png")
                 for _ in range(20):
                     if sb.is_element_visible('#recaptcha-anchor'):
                         print("✅ reCAPTCHA checkbox 已出现")
@@ -256,15 +255,31 @@ def renew_host2play(url, proxy_url=None):
                 else:
                     print("⚠️ checkbox 等待超时")
                     sb.save_screenshot("recaptcha_checkbox_timeout.png")
+                    sb.switch_to_default_content()
+                    msg = "❌ reCAPTCHA checkbox 超时"
+                    return success, msg
 
-                sb.uc_click('#recaptcha-anchor')
-                time.sleep(5)
+                # ←←← 核心修复：用 JS 派发点击
+                print("🖱️ JS 派发点击 reCAPTCHA checkbox...")
+                sb.execute_script("""
+                    const anchor = document.getElementById('recaptcha-anchor');
+                    if (anchor) {
+                        anchor.click();
+                        const event = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
+                        anchor.dispatchEvent(event);
+                    }
+                """)
+                time.sleep(6)
 
+                # 检查是否已勾选
                 checked = sb.get_attribute('#recaptcha-anchor', 'aria-checked')
                 sb.switch_to_default_content()
 
-                if checked != 'true':
-                    print("🎲 需要破解验证码...")
+                if checked == 'true':
+                    print("✅ reCAPTCHA 已自动验证通过（无需破解）")
+                    solved_captcha = True
+                else:
+                    print("🎲 需要手动破解音频验证码...")
                     bframe_xpath = '//iframe[contains(@src, "recaptcha/api2/bframe")]'
                     if sb.is_element_visible(bframe_xpath):
                         sb.switch_to_frame(bframe_xpath)
@@ -272,8 +287,6 @@ def renew_host2play(url, proxy_url=None):
                         if solver.solve():
                             solved_captcha = True
                         sb.switch_to_default_content()
-                else:
-                    solved_captcha = True
             else:
                 print("⚠️ 未发现 reCAPTCHA iframe")
                 sb.save_screenshot(f"debug_no_recaptcha_{int(time.time())}.png")
