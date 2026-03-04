@@ -3,6 +3,7 @@ import sys
 import time
 import random
 import requests
+import tempfile
 from xvfbwrapper import Xvfb
 from DrissionPage import ChromiumPage, ChromiumOptions
 
@@ -177,13 +178,27 @@ def renew_host2play(url, proxy_url=None):
 
     try:
         # 配置 DrissionPage 的隐蔽性参数
+        try:
         co = ChromiumOptions()
+        co.set_browser_path('/usr/bin/google-chrome') # 指定 Ubuntu 下的 Chrome 路径
+        
+        # 服务器 CI 环境防崩溃核心参数
         co.set_argument('--no-sandbox')
+        co.set_argument('--disable-dev-shm-usage') # 防止共享内存不足导致崩溃
         co.set_argument('--disable-gpu')
+        co.set_argument('--disable-setuid-sandbox') 
+        co.set_argument('--disable-software-rasterizer')
+        co.set_argument('--disable-extensions')
         co.set_argument('--no-first-run')
         co.set_argument('--no-default-browser-check')
         co.set_argument('--disable-popup-blocking')
         co.set_argument('--window-size=1280,720')
+        
+        # 隔离用户数据和端口，解决 9222 端口被占用或冲突的问题
+        user_data_dir = tempfile.mkdtemp()
+        co.set_user_data_path(user_data_dir)
+        co.auto_port() 
+        
         co.headless(False) # 必须为 False 才能配合 Xvfb
 
         if proxy_url:
