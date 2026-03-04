@@ -178,7 +178,6 @@ def renew_host2play(url, proxy_url=None):
 
     try:
         # 配置 DrissionPage 的隐蔽性参数
-        try:
         co = ChromiumOptions()
         co.set_browser_path('/usr/bin/google-chrome') # 指定 Ubuntu 下的 Chrome 路径
         
