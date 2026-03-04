@@ -217,7 +217,12 @@ def renew_host2play(url, proxy_url=None):
         print("🖱️ 打开续期弹窗...")
         renew_btn1 = page.ele('xpath://button[contains(text(), "Renew server")]', timeout=3)
         if renew_btn1:
-            page.actions.move_to(renew_btn1).click()
+            try:
+                # 尝试常规点击
+                renew_btn1.click() 
+            except:
+                # 如果被遮挡或在视口外，强制使用 JS 点击穿透
+                renew_btn1.click(by_js=True)
         else:
             page.run_js("document.querySelectorAll('button').forEach(b => {if(b.textContent.includes('Renew server')) b.click();});")
         time.sleep(3)
@@ -228,17 +233,21 @@ def renew_host2play(url, proxy_url=None):
                 break
             time.sleep(1)
 
-        renew_btn2 = page.ele('tag:button@@text():Renew server', timeout=2)
+        # 定位弹窗内的第二个 Renew server 按钮
+        renew_btn2 = page.ele('xpath://button[contains(text(), "Renew server")]', timeout=2)
         if renew_btn2:
-            page.actions.move_to(renew_btn2).click()
+            try:
+                renew_btn2.click()
+            except:
+                renew_btn2.click(by_js=True)
         
         # 给验证码充分的加载时间，并引入随机波动
         time.sleep(random.uniform(7, 10))   
 
         solved_captcha = False
         
-        # DrissionPage 处理 iframe 非常简单，直接获取 frame 对象即可
-        anchor_frame = page.get_frame('@src():recaptcha/api2/anchor', timeout=5)
+        # 🚨 优化点 1：使用更兼容的 xpath 语法查找 iframe
+        anchor_frame = page.get_frame('xpath://iframe[contains(@src, "recaptcha/api2/anchor")]', timeout=5)
 
         if anchor_frame:
             print("✅ 锁定 reCAPTCHA 框架")
@@ -252,10 +261,11 @@ def renew_host2play(url, proxy_url=None):
             
             if not anchor_box:
                 msg = "❌ reCAPTCHA checkbox 超时"
+                # 🚨 优化点 2：失败时立即截图！
+                page.get_screenshot(path='.', name='error_anchor_timeout.png')
                 return success, msg
 
             print("🖱️ 物理模拟点击 reCAPTCHA checkbox...")
-            # 利用 actions 进行跨 frame 的平滑移动
             page.actions.move_to(anchor_box, duration=random.uniform(0.5, 1.5))
             time.sleep(random.uniform(0.2, 0.6))
             anchor_box.click()
@@ -268,26 +278,35 @@ def renew_host2play(url, proxy_url=None):
                 solved_captcha = True
             else:
                 print("🎲 需要手动破解音频验证码...")
-                bframe = page.get_frame('@src():recaptcha/api2/bframe', timeout=5)
+                bframe = page.get_frame('xpath://iframe[contains(@src, "recaptcha/api2/bframe")]', timeout=5)
                 if bframe:
                     solver = RecaptchaAudioSolver(page)
                     if solver.solve(bframe):
                         solved_captcha = True
         else:
             print("⚠️ 未发现 reCAPTCHA iframe")
+            # 🚨 优化点 2：找不到 iframe 时立即保存当前屏幕截图！
+            page.get_screenshot(path='.', name='error_no_iframe.png')
+            msg = "❌ 未找到 reCAPTCHA 验证码区域，请检查截图。"
 
         if solved_captcha:
             print("🚀 验证完成，点击最终 Renew...")
             final_btn = page.ele('xpath://button[normalize-space(text())="Renew"]', timeout=3)
             if final_btn:
-                page.actions.move_to(final_btn).click()
+                try:
+                    final_btn.click()
+                except:
+                    final_btn.click(by_js=True)
                 time.sleep(10)
                 msg = "🎉 续期操作成功！"
                 success = True
             else:
                 msg = "❌ 找不到最终 Renew 按钮"
+                page.get_screenshot(path='.', name='error_no_final_btn.png')
         else:
-            msg = "❌ 无法通过 reCAPTCHA"
+            if "操作成功" not in msg: # 避免覆盖上面具体的报错信息
+                msg = "❌ 无法通过 reCAPTCHA"
+                page.get_screenshot(path='.', name='error_captcha_failed.png'
 
     except Exception as e:
         msg = f"💥 运行异常: {str(e)[:200]}"
