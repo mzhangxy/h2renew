@@ -240,7 +240,7 @@ def renew_host2play(url, proxy_url=None):
             # 随机移动鼠标到一个安全的空白区域
             page.actions.move(random.randint(100, 800), random.randint(100, 500))
             time.sleep(random.uniform(0.5, 1.0))
-        page.scroll.top()
+        page.scroll.to_top()
         time.sleep(random.uniform(1.0, 2.0))
 
         print("🖱️ 打开续期弹窗...")
