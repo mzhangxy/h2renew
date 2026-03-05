@@ -322,7 +322,7 @@ def renew_host2play(url, proxy_url=None):
                 except:
                     final_btn.click(by_js=True)
                 time.sleep(10)
-                msg = "🎉 续期操作成功！"
+                msg = "🎉 host2play 续期操作成功！"
                 success = True
             else:
                 msg = "❌ 找不到最终 Renew 按钮"
