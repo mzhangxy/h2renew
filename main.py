@@ -158,7 +158,7 @@ class RecaptchaAudioSolver:
             return None
 
 # ==============================================================================
-# 核心续期逻辑
+# 核心续期业务逻辑
 # ==============================================================================
 def renew_host2play(url, proxy_url=None):
     print("启动 Xvfb 虚拟桌面...")
@@ -195,21 +195,16 @@ def renew_host2play(url, proxy_url=None):
 
         page = ChromiumPage(co)
 
-        # 在请求任何页面之前，注入底层指纹欺骗脚本
         print("🛡️ 注入 WebGL 硬件欺骗与反侦察指纹...")
         page.add_init_js("""
-            // 伪装 WebGL 显卡指纹为常见的 Intel 集显
             const getParameter = WebGLRenderingContext.prototype.getParameter;
             WebGLRenderingContext.prototype.getParameter = function(parameter) {
                 if (parameter === 37445) return 'Intel Inc.';
                 if (parameter === 37446) return 'Intel(R) UHD Graphics 630';
                 return getParameter.apply(this, [parameter]);
             };
-            // 彻底抹除自动化特征
             Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-            // 伪装浏览器语言与真实用户习惯一致
             Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
-            // 伪装插件长度 (无头浏览器通常为 0)
             Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3]});
         """)
 
@@ -231,13 +226,11 @@ def renew_host2play(url, proxy_url=None):
             consent_btn.click()
             time.sleep(3)
 
-        # 🚨 植入“热身”逻辑，积累人类交互数据
         print("🤸 积累真实的鼠标轨迹和滚动数据...")
         for _ in range(3):
             scroll_y = random.randint(200, 600)
             page.scroll.down(scroll_y)
             time.sleep(random.uniform(0.5, 1.5))
-            # 随机移动鼠标到一个安全的空白区域
             page.actions.move(random.randint(100, 800), random.randint(100, 500))
             time.sleep(random.uniform(0.5, 1.0))
         time.sleep(random.uniform(1.0, 2.0))
@@ -283,10 +276,12 @@ def renew_host2play(url, proxy_url=None):
             if not anchor_box:
                 msg = "❌ reCAPTCHA checkbox 超时"
                 try:
-                    time.sleep(2)
-                    page.get_screenshot(path='.', name='error_anchor_timeout.png', full_page=False)
-                except Exception as ss_err:
-                    print(f"⚠️ 截图失败: {ss_err}")
+                    page.handle_alert(accept=True)
+                    with open("error_anchor_timeout.html", "w", encoding="utf-8") as f:
+                        f.write(page.html)
+                    print("✅ 已瞬间保存现场的 HTML 源码")
+                except Exception as dump_err:
+                    print(f"⚠️ 保存源码失败: {dump_err}")
                 return success, msg
 
             print("🖱️ 物理模拟点击 reCAPTCHA checkbox...")
@@ -301,7 +296,7 @@ def renew_host2play(url, proxy_url=None):
                 print("✅ reCAPTCHA 已自动验证通过！")
                 solved_captcha = True
             else:
-                print("🎲 破解音频验证码...")
+                print("🎲 需要手动破解音频验证码...")
                 bframe = page.get_frame('xpath://iframe[contains(@src, "recaptcha/api2/bframe")]', timeout=5)
                 if bframe:
                     solver = RecaptchaAudioSolver(page)
@@ -310,14 +305,16 @@ def renew_host2play(url, proxy_url=None):
         else:
             print("⚠️ 未发现 reCAPTCHA iframe")
             try:
-                time.sleep(2)
-                page.get_screenshot(path='.', name='error_no_iframe.png', full_page=False)
-            except Exception as ss_err:
-                print(f"⚠️ 截图失败: {ss_err}")
-            msg = "❌ 未找到 reCAPTCHA 验证码区域，请检查截图。"
+                page.handle_alert(accept=True)
+                with open("error_no_iframe.html", "w", encoding="utf-8") as f:
+                    f.write(page.html)
+                print("✅ 已瞬间保存现场的 HTML 源码")
+            except Exception as dump_err:
+                print(f"⚠️ 保存源码失败: {dump_err}")
+            msg = "❌ 未找到 reCAPTCHA 验证码区域，请检查源码。"
 
         if solved_captcha:
-            print("🚀 验证完成，点击 Renew...")
+            print("🚀 验证完成，点击最终 Renew...")
             final_btn = page.ele('xpath://button[normalize-space(text())="Renew"]', timeout=3)
             if final_btn:
                 try:
@@ -330,19 +327,22 @@ def renew_host2play(url, proxy_url=None):
             else:
                 msg = "❌ 找不到最终 Renew 按钮"
                 try:
-                    time.sleep(2)
-                    page.get_screenshot(path='.', name='error_no_final_btn.png', full_page=False)
-                except Exception as ss_err:
-                    print(f"⚠️ 截图失败: {ss_err}")
-            
+                    page.handle_alert(accept=True)
+                    with open("error_no_final_btn.html", "w", encoding="utf-8") as f:
+                        f.write(page.html)
+                    print("✅ 已瞬间保存现场的 HTML 源码")
+                except Exception as dump_err:
+                    print(f"⚠️ 保存源码失败: {dump_err}")
         else:
             if "操作成功" not in msg:
                 msg = "❌ 无法通过 reCAPTCHA"
                 try:
-                    time.sleep(2)
-                    page.get_screenshot(path='.', name='error_captcha_failed.png', full_page=False)
-                except Exception as ss_err:
-                    print(f"⚠️ 截图失败: {ss_err}")
+                    page.handle_alert(accept=True)
+                    with open("error_captcha_failed.html", "w", encoding="utf-8") as f:
+                        f.write(page.html)
+                    print("✅ 已瞬间保存现场的 HTML 源码")
+                except Exception as dump_err:
+                    print(f"⚠️ 保存源码失败: {dump_err}")
 
     except Exception as e:
         msg = f"💥 运行异常: {str(e)[:200]}"
