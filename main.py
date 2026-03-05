@@ -274,7 +274,7 @@ def renew_host2play(url, proxy_url=None):
                 time.sleep(1)
             
             if not anchor_box:
-                msg = "❌ reCAPTCHA checkbox 超时"
+                msg = "❌ host2 reCAPTCHA checkbox 超时"
                 try:
                     page.handle_alert(accept=True)
                     with open("error_anchor_timeout.html", "w", encoding="utf-8") as f:
@@ -311,7 +311,7 @@ def renew_host2play(url, proxy_url=None):
                 print("✅ 已瞬间保存现场的 HTML 源码")
             except Exception as dump_err:
                 print(f"⚠️ 保存源码失败: {dump_err}")
-            msg = "❌ 未找到 reCAPTCHA 验证码区域，请检查源码。"
+            msg = "❌ host2 未找到 reCAPTCHA 验证码区域，请检查源码。"
 
         if solved_captcha:
             print("🚀 验证完成，点击最终 Renew...")
@@ -322,10 +322,10 @@ def renew_host2play(url, proxy_url=None):
                 except:
                     final_btn.click(by_js=True)
                 time.sleep(10)
-                msg = "🎉 host2play 续期操作成功！"
+                msg = "🎉 host2 续期操作成功！"
                 success = True
             else:
-                msg = "❌ 找不到最终 Renew 按钮"
+                msg = "❌ host2 找不到最终 Renew 按钮"
                 try:
                     page.handle_alert(accept=True)
                     with open("error_no_final_btn.html", "w", encoding="utf-8") as f:
@@ -335,7 +335,7 @@ def renew_host2play(url, proxy_url=None):
                     print(f"⚠️ 保存源码失败: {dump_err}")
         else:
             if "操作成功" not in msg:
-                msg = "❌ 无法通过 reCAPTCHA"
+                msg = "❌ host2 无法通过 reCAPTCHA"
                 try:
                     page.handle_alert(accept=True)
                     with open("error_captcha_failed.html", "w", encoding="utf-8") as f:
@@ -345,7 +345,7 @@ def renew_host2play(url, proxy_url=None):
                     print(f"⚠️ 保存源码失败: {dump_err}")
 
     except Exception as e:
-        msg = f"💥 运行异常: {str(e)[:200]}"
+        msg = f"💥 host2 运行异常: {str(e)[:200]}"
         print(msg)
     finally:
         if page:
