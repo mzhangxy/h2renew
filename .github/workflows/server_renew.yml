@@ -22,7 +22,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb ffmpeg unzip
-          # 🚨 新增：显式安装 Google Chrome，确保 DrissionPage 有底层的浏览器内核可用
           wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
           sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
           sudo apt-get install -y google-chrome-stable
@@ -46,14 +45,13 @@ jobs:
           echo "⏳ 等待 Xray 核心启动 (5秒)..."
           sleep 5
           
-          echo "🌐 打印本地代理测试日志 (不中断流程)..."
-          # 仅打印输出供排查，允许非 0 退出码继续向下执行
+          echo "🌐 打印本地代理测试日志..."
+          # 打印输出供排查
           curl -x http://127.0.0.1:10808 -I https://www.google.com/generate_204 || true
 
       - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
-          # 🚨 核心修改：移除 seleniumbase，加入 DrissionPage
           pip install DrissionPage xvfbwrapper requests SpeechRecognition pydub
 
       - name: Run Renew Script
@@ -61,7 +59,7 @@ jobs:
           RENEW_URL: ${{ secrets.RENEW_URL }}
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-          # 明确传入代理地址供 Python 脚本读取
+          # 传入代理地址供 Python 脚本读取
           PROXY: http://127.0.0.1:10808 
         run: python main.py 
 
